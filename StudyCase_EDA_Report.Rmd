@@ -1,0 +1,404 @@
+---
+title: "Análisis Exploratorio de Datos y Aplicación de Regresion Lineal Simple"
+author: "Edwin Silva Salas - Actividad 3 - Metodos y Simulación Estadisticas"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.height = 5)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+# helper to safely read CSVs produced by EDA
+safe_read <- function(path) {
+  if (file.exists(path)) readr::read_csv(path) else tibble()
+}
+
+image_exists <- function(path) {
+  file.exists(path)
+}
+
+# Cargar los datos originales para graficar en vivo
+df_mat <- if (file.exists("student-mat.csv")) readr::read_csv2("student-mat.csv") else tibble()
+df_por <- if (file.exists("student-por.csv")) readr::read_csv2("student-por.csv") else tibble()
+```
+
+# Resumen ejecutivo
+
+Este informe contiene un análisis exploratorio de datos (EDA) para los conjuntos `student_mat.csv` y `student_por.csv`.Descargados de la url **https://archive.ics.uci.edu/dataset/320/student+performance**, Este informe incluye tablas descriptivas, identificación de valores faltantes, detección de outliers por la regla IQR, matrices y mapas de correlación, y gráficos de dispersión de la calificación o nota final de cada estudiante (G3) frente a las variables con mayor correlación.
+
+
+# Datos cargados
+Se descarga de la ubicacion URL mencionda anteriormente un archivo (*.zip) con el contenido de los datos en archivos (*.csv) como insumo de esta actividad, se respectivo analisis EDA y posterior aplicacion del Modelo de Regresion Lineal Simple, **Simple Lineal Regression Model (SLRM)**
+
+```{r files-check}
+# confirmamos que los archivos base existen en el proyecto
+cat("student-mat.csv:", file.exists("student-mat.csv"), "\n")
+cat("student-por.csv:", file.exists("student-por.csv"), "\n")
+```
+
+
+## 1) student_mat — Resumen numérico y missing
+
+```{r mat-numeric}
+# Crear resumen numérico directamente a partir de student-mat.csv
+if (nrow(df_mat) > 0) {
+  num_sum_mat <- df_mat %>%
+    select(where(is.numeric)) %>%
+    summarise(across(everything(), list(
+      mean = ~mean(.x, na.rm = TRUE),
+      sd = ~sd(.x, na.rm = TRUE),
+      median = ~median(.x, na.rm = TRUE),
+      min = ~min(.x, na.rm = TRUE),
+      max = ~max(.x, na.rm = TRUE),
+      missing = ~sum(is.na(.x))
+    ), .names = "{.col}_{.fn}"))
+
+  # Convertir a formato largo para mostrar
+  num_sum_mat_long <- num_sum_mat %>%
+    pivot_longer(everything(), names_to = "metric", values_to = "value") %>%
+    separate(metric, into = c("variable","stat"), sep = "_(?=[^_]+$)") %>%
+    pivot_wider(names_from = stat, values_from = value) %>%
+    arrange(variable)
+
+  num_sum_mat_long %>%
+    kable(digits = 3, caption = "Resumen numérico — student_mat") %>%
+    kable_styling(full_width = FALSE)
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
+```
+
+```{r mat-missing}
+# Tabla de valores faltantes por variable (student_mat)
+if (nrow(df_mat) > 0) {
+  missing_mat <- df_mat %>%
+    summarise(across(everything(), ~sum(is.na(.)))) %>%
+    pivot_longer(everything(), names_to = "variable", values_to = "missing") %>%
+    arrange(desc(missing))
+
+  missing_mat %>%
+    kable(digits = 0, caption = "Missing values — student_mat") %>%
+    kable_styling(full_width = FALSE)
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
+```
+
+
+### Boxplots y distribución de G3 (student_mat)
+
+```{r mat-plots, fig.cap='Boxplots y histograma G3 (student_mat)'}
+if (nrow(df_mat)>0) {
+  library(ggplot2)
+  # Histograma G3
+  p1 <- ggplot(df_mat, aes(x = G3)) +
+    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
+    labs(title = "Distribución de G3 (student_mat)", x = "G3", y = "Frecuencia") +
+    theme_minimal()
+  print(p1)
+
+  # Boxplots por variables numéricas
+  nums <- df_mat %>% select(where(is.numeric))
+  if (ncol(nums) > 0) {
+    nums_long <- nums %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
+    p2 <- ggplot(nums_long, aes(x = variable, y = value)) +
+      geom_boxplot(outlier.size = 1, fill = "#74a9cf") +
+      coord_flip() +
+      labs(title = "Boxplots variables numéricas (student_mat)") +
+      theme_minimal()
+    print(p2)
+  }
+
+  # Mapa de correlación (numéricas)
+  nums <- df_mat %>% select(where(is.numeric))
+  if (ncol(nums) >= 2) {
+    cor_mat <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_mat))
+    p3 <- ggplot(cor_df, aes(Var1, Var2, fill = Freq)) +
+      geom_tile() +
+      scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(title = "Mapa de correlación (num) - student_mat") +
+      coord_fixed()
+    print(p3)
+  }
+} else {
+  cat("Archivo student-mat.csv no encontrado o vacío.\n")
+}
+```
+
+
+## 2) student_mat — Outliers e correlaciones fuertes
+
+```{r mat-outliers}
+# Detección de outliers por regla IQR para variables numéricas
+if (nrow(df_mat) > 0) {
+  nums <- df_mat %>% select(where(is.numeric))
+  out_mat <- map_dfr(names(nums), function(var) {
+    x <- nums[[var]]
+    if (all(is.na(x))) return(tibble(variable = var, outlier_count = 0))
+    q1 <- quantile(x, 0.25, na.rm = TRUE)
+    q3 <- quantile(x, 0.75, na.rm = TRUE)
+    iqr <- q3 - q1
+    lower <- q1 - 1.5 * iqr
+    upper <- q3 + 1.5 * iqr
+    tibble(variable = var, outlier_count = sum(x < lower | x > upper, na.rm = TRUE))
+  })
+
+  out_mat %>% filter(outlier_count > 0) %>%
+    kable(digits = 0, caption = "Outliers detectados (IQR) — student_mat") %>%
+    kable_styling(full_width = FALSE)
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
+```
+
+```{r mat-strong}
+# Correlaciones fuertes |r| >= 0.7 (numéricas)
+if (nrow(df_mat) > 0) {
+  nums <- df_mat %>% select(where(is.numeric))
+  strong_mat <- tibble()
+  if (ncol(nums) >= 2) {
+    cor_mat <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_mat))
+    strong_mat <- cor_df %>%
+      filter(Var1 != Var2) %>%
+      mutate(abs_r = abs(Freq)) %>%
+      filter(abs_r >= 0.7) %>%
+      arrange(desc(abs_r)) %>%
+      rename(variable1 = Var1, variable2 = Var2, r = Freq) %>%
+      select(variable1, variable2, r)
+  }
+
+  if (nrow(strong_mat) > 0) {
+    strong_mat %>% kable(digits = 3, caption = "Correlaciones fuertes (|r|>=0.7) — student_mat") %>% kable_styling(full_width = FALSE)
+  } else cat("No se detectaron correlaciones fuertes (|r|>=0.7) en variables numéricas.\n")
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
+```
+
+```{r mat-scatter, fig.cap='Scatter G3 vs top correlates (student_mat)'}
+if (nrow(df_mat)>0) {
+  nums <- df_mat %>% select(where(is.numeric))
+  if ("G3" %in% names(nums) && ncol(nums) >= 2) {
+    cor_with_G3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
+    cor_with_G3 <- tibble(variable = rownames(cor_with_G3), corr = cor_with_G3[,1]) %>%
+      filter(variable != "G3") %>%
+      arrange(desc(abs(corr)))
+    top_vars <- head(cor_with_G3$variable, 6)
+    if (length(top_vars) > 0) {
+      scatter_df <- df_mat %>% select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
+      p4 <- ggplot(scatter_df, aes(x = value, y = G3)) +
+        geom_point(alpha = 0.6, size = 1.5, color = "#2b8cbe") +
+        geom_smooth(method = "lm", se = FALSE, color = "red") +
+        facet_wrap(~variable, scales = "free_x") +
+        labs(title = "G3 vs variables con mayor correlación (student_mat)") +
+        theme_minimal()
+      print(p4)
+    }
+  }
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
+```
+
+
+## 3) student_por — Resumen numérico y missing
+
+```{r por-numeric}
+# Crear resumen numérico directamente a partir de student-por.csv
+if (nrow(df_por) > 0) {
+  num_sum_por <- df_por %>%
+    select(where(is.numeric)) %>%
+    summarise(across(everything(), list(
+      mean = ~mean(.x, na.rm = TRUE),
+      sd = ~sd(.x, na.rm = TRUE),
+      median = ~median(.x, na.rm = TRUE),
+      min = ~min(.x, na.rm = TRUE),
+      max = ~max(.x, na.rm = TRUE),
+      missing = ~sum(is.na(.x))
+    ), .names = "{.col}_{.fn}"))
+
+  num_sum_por_long <- num_sum_por %>%
+    pivot_longer(everything(), names_to = "metric", values_to = "value") %>%
+    separate(metric, into = c("variable","stat"), sep = "_(?=[^_]+$)") %>%
+    pivot_wider(names_from = stat, values_from = value) %>%
+    arrange(variable)
+
+  num_sum_por_long %>%
+    kable(digits = 3, caption = "Resumen numérico — student_por") %>%
+    kable_styling(full_width = FALSE)
+} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+```
+
+```{r por-missing}
+# Tabla de valores faltantes por variable (student_por)
+if (nrow(df_por) > 0) {
+  missing_por <- df_por %>%
+    summarise(across(everything(), ~sum(is.na(.)))) %>%
+    pivot_longer(everything(), names_to = "variable", values_to = "missing") %>%
+    arrange(desc(missing))
+
+  missing_por %>%
+    kable(digits = 0, caption = "Missing values — student_por") %>%
+    kable_styling(full_width = FALSE)
+} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+```
+
+
+### Boxplots y distribución de G3 (student_por)
+
+```{r por-plots, fig.cap='Boxplots y histograma G3 (student_por)'}
+if (nrow(df_por)>0) {
+  library(ggplot2)
+  # Histograma G3
+  p1 <- ggplot(df_por, aes(x = G3)) +
+    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
+    labs(title = "Distribución de G3 (student_por)", x = "G3", y = "Frecuencia") +
+    theme_minimal()
+  print(p1)
+
+  # Boxplots por variables numéricas
+  nums <- df_por %>% select(where(is.numeric))
+  if (ncol(nums) > 0) {
+    nums_long <- nums %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
+    p2 <- ggplot(nums_long, aes(x = variable, y = value)) +
+      geom_boxplot(outlier.size = 1, fill = "#74a9cf") +
+      coord_flip() +
+      labs(title = "Boxplots variables numéricas (student_por)") +
+      theme_minimal()
+    print(p2)
+  }
+
+  # Mapa de correlación (numéricas)
+  nums <- df_por %>% select(where(is.numeric))
+  if (ncol(nums) >= 2) {
+    cor_mat <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_mat))
+    p3 <- ggplot(cor_df, aes(Var1, Var2, fill = Freq)) +
+      geom_tile() +
+      scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(title = "Mapa de correlación (num) - student_por") +
+      coord_fixed()
+    print(p3)
+  }
+} else {
+  cat("Archivo student-por.csv no encontrado o vacío.\n")
+}
+```
+
+
+## 4) student_por — Outliers y correlaciones fuertes
+
+```{r por-outliers}
+# Detección de outliers por regla IQR para variables numéricas (student_por)
+if (nrow(df_por) > 0) {
+  nums <- df_por %>% select(where(is.numeric))
+  out_por <- map_dfr(names(nums), function(var) {
+    x <- nums[[var]]
+    if (all(is.na(x))) return(tibble(variable = var, outlier_count = 0))
+    q1 <- quantile(x, 0.25, na.rm = TRUE)
+    q3 <- quantile(x, 0.75, na.rm = TRUE)
+    iqr <- q3 - q1
+    lower <- q1 - 1.5 * iqr
+    upper <- q3 + 1.5 * iqr
+    tibble(variable = var, outlier_count = sum(x < lower | x > upper, na.rm = TRUE))
+  })
+
+  out_por %>% filter(outlier_count > 0) %>%
+    kable(digits = 0, caption = "Outliers detectados (IQR) — student_por") %>%
+    kable_styling(full_width = FALSE)
+} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+```
+
+```{r por-strong}
+# Correlaciones fuertes |r| >= 0.7 (numéricas) para student_por
+if (nrow(df_por) > 0) {
+  nums <- df_por %>% select(where(is.numeric))
+  strong_por <- tibble()
+  if (ncol(nums) >= 2) {
+    cor_mat <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_mat))
+    strong_por <- cor_df %>%
+      filter(Var1 != Var2) %>%
+      mutate(abs_r = abs(Freq)) %>%
+      filter(abs_r >= 0.7) %>%
+      arrange(desc(abs_r)) %>%
+      rename(variable1 = Var1, variable2 = Var2, r = Freq) %>%
+      select(variable1, variable2, r)
+  }
+
+  if (nrow(strong_por) > 0) {
+    strong_por %>% kable(digits = 3, caption = "Correlaciones fuertes (|r|>=0.7) — student_por") %>% kable_styling(full_width = FALSE)
+  } else cat("No se detectaron correlaciones fuertes (|r|>=0.7) en variables numéricas.\n")
+} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+```
+
+```{r por-scatter, fig.cap='Scatter G3 vs top correlates (student_por)'}
+if (nrow(df_por)>0) {
+  nums <- df_por %>% select(where(is.numeric))
+  if ("G3" %in% names(nums) && ncol(nums) >= 2) {
+    cor_with_G3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
+    cor_with_G3 <- tibble(variable = rownames(cor_with_G3), corr = cor_with_G3[,1]) %>%
+      filter(variable != "G3") %>%
+      arrange(desc(abs(corr)))
+    top_vars <- head(cor_with_G3$variable, 6)
+    if (length(top_vars) > 0) {
+      scatter_df <- df_por %>% select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
+      p4 <- ggplot(scatter_df, aes(x = value, y = G3)) +
+        geom_point(alpha = 0.6, size = 1.5, color = "#2b8cbe") +
+        geom_smooth(method = "lm", se = FALSE, color = "red") +
+        facet_wrap(~variable, scales = "free_x") +
+        labs(title = "G3 vs variables con mayor correlación (student_por)") +
+        theme_minimal()
+      print(p4)
+    }
+  }
+} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+```
+
+
+# 5) Comparación entre datasets
+
+```{r compare-summary}
+# dimensiones y conteos de missing
+mat_missing_total <- if (nrow(df_mat) > 0) sum(is.na(df_mat)) else NA
+por_missing_total <- if (nrow(df_por) > 0) sum(is.na(df_por)) else NA
+
+mat_dims <- if (nrow(df_mat) > 0) dim(df_mat) else c(NA,NA)
+por_dims <- if (nrow(df_por) > 0) dim(df_por) else c(NA,NA)
+
+comp_tab <- tibble(
+  dataset = c("student_mat","student_por"),
+  rows = c(mat_dims[1], por_dims[1]),
+  cols = c(mat_dims[2], por_dims[2]),
+  total_missing = c(mat_missing_total, por_missing_total)
+)
+
+comp_tab %>% kable(caption = "Comparación resumida entre datasets") %>% kable_styling(full_width = FALSE)
+```
+
+
+# 6) Conclusiones y siguientes pasos
+
+En esta sección deberás redactar las conclusiones principales derivadas del EDA. A modo de ayuda, incluye:
+
+- Variables con mayor correlación con `G3` (candidatas para regresión simple).
+- Variables con valores faltantes a priorizar.
+- Variables con outliers que requieren inspección.
+- Observaciones sobre la distribución de `G3` y posibles transformaciones.
+
+
+---
+
+**Cómo renderizar el informe**
+
+Si quieres generar el HTML localmente, en R ejecuta:
+
+```r
+rmarkdown::render("StudyCase_EDA_Report.Rmd")
+```
+
+
+

@@ -1,0 +1,17 @@
+# R / RStudio
+.Rhistory
+.RData
+.Rproj.user
+.Ruserdata
+.Renviron
+
+# Directorios y outputs
+EDA_plots/
+*.html
+*.png
+*.pdf
+
+# OneDrive / SO
+~$*
+Thumbs.db
+.DS_Store
