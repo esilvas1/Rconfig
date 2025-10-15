@@ -360,20 +360,42 @@ De esta manera se puede visualizar que no existen variables atipicas en este con
 
 A continuación se construye un histograma de la variable objetivo (G3) para examinar su distribución y características principales (asimetría, multimodalidad, concentración y posibles valores extremos), con el fin de extraer conclusiones sobre su comportamiento antes del modelado.
 
-```{r Mat_Histograma_G3}
-# Histograma G3
-if (nrow(df_mat)>0) {
+
+```{r Mat_Histograma_G3, fig.width=8, fig.height=4}
+if (nrow(df_mat) > 0 && "G3" %in% names(df_mat)) {
   library(ggplot2)
-  p1 <- ggplot(df_mat, aes(x = G3)) +
-    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
-    labs(title = "Grafica A8: Distribución de G3 (student_mat)", x = "G3", y = "Frecuencia") +
-    theme_minimal()
-  print(p1)
+  g3 <- df_mat$G3
+  g3 <- g3[!is.na(g3)]
+  if (length(g3) > 1 && sd(g3) > 0) {
+    mu <- mean(g3)
+    sigma <- sd(g3)
+    p1 <- ggplot(df_mat, aes(x = G3)) +
+      geom_histogram(aes(y = ..density..), binwidth = 1, fill = "#2c7fb8", color = "white") +
+      stat_function(fun = dnorm, args = list(mean = mu, sd = sigma), color = "red", size = 1) +
+      geom_density(alpha = 0.15, fill = "red", color = NA) +  # opcional: densidad kernel
+      labs(title = "Grafica A8: Distribución de G3 (student_mat)",
+           subtitle = paste0("Normal ajustada: μ=", round(mu,2), ", σ=", round(sigma,2)),
+           x = "G3", y = "Densidad") +
+      theme_minimal()
+    print(p1)
+  } else {
+    cat("G3 no tiene suficientes observaciones válidas o sd = 0.\n")
+  }
 } else {
-  cat("Archivo student-mat.csv no encontrado o vacío.\n")
+  cat("Archivo student-mat.csv no encontrado, vacío o columna G3 ausente.\n")
 }
 ```
 
+**Estadísticos mostrados:** 
+media ≈ 10.4, desviación estándar ≈ 4.6.
+
+**Forma general:** distribución aproximadamente unimodal con pico alrededor de calificaciones entre 9–11; la campana normal ajustada aproxima bien el centro pero no captura totalmente los extremos.
+
+**Desviaciones respecto a la normal:** presencia de valores muy bajos (cúmulo cercano a 0) y una cola derecha moderada — ligera asimetría/colas más pesadas que la normal.
+
+**Implicaciones para modelado:** la normalidad no es perfecta pero suficiente como punto de partida; se deben validar residuos tras ajustar el modelo.
+
+**Recomendaciones preliminares:** proceder con regresión lineal simple usando G3, para ello se debe revisar influencias (outliers), heterocedasticidad.
 
 ## 2) Resumen numérico: missing, Outlier and Correlation (student_por)
 
