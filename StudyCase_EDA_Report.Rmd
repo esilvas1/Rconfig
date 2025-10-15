@@ -35,12 +35,64 @@ Este informe contiene un análisis exploratorio de datos (EDA) para los conjunto
 
 
 # Datos cargados
-Se descarga de la ubicacion URL mencionda anteriormente un archivo (*.zip) con el contenido de los datos en archivos (*.csv) como insumo de esta actividad, se respectivo analisis EDA y posterior aplicacion del Modelo de Regresion Lineal Simple, **Simple Lineal Regression Model (SLRM)**
+Se descarga de la ubicacion URL mencionda anteriormente un archivo (*.zip) con el contenido de los datos en archivos (*.csv) como insumo de esta actividad, se realiza su respectivo analisis EDA y posterior aplicacion del Modelo de Regresion Lineal Simple, **Simple Lineal Regression Model (SLRM)**
 
 ```{r files-check}
 # confirmamos que los archivos base existen en el proyecto
 cat("student-mat.csv:", file.exists("student-mat.csv"), "\n")
 cat("student-por.csv:", file.exists("student-por.csv"), "\n")
+```
+
+Se muestran los nombres de las columnas o variables de los datasets **student_xxx** y se describe en español su significado o descripcion de columna en la **Tabla A9**:
+
+```{r codebook_table, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr); library(tidyr); library(knitr); library(kableExtra)
+
+# Reconstruir codebook_tbl si no existe (fallback rápido)
+if (!exists("codebook_tbl")) {
+  spanish_dict <- c(
+    school="Escuela (GP/MS)", sex="Sexo (F/M)", age="Edad (años)", address="Dirección (U/R)",
+    famsize="Tamaño familia (LE3/GT3)", Pstatus="Estado padres (T/A)", Medu="Educación madre (0-4)",
+    Fedu="Educación padre (0-4)", Mjob="Trabajo madre", Fjob="Trabajo padre", reason="Razón",
+    guardian="Tutor", traveltime="Tiempo viaje (1-4)", studytime="Tiempo estudio (1-4)",
+    failures="Reprobadas previas", schoolsup="Apoyo escolar", famsup="Apoyo familiar",
+    paid="Clases pagadas", activities="Actividades extra", nursery="Guardería", higher="Deseo superior",
+    internet="Internet en casa", romantic="Relación romántica", famrel="Relación familiar (1-5)",
+    freetime="Tiempo libre (1-5)", goout="Salir con amigos (1-5)", Dalc="Alcohol entre semana (1-5)",
+    Walc="Alcohol fin de semana (1-5)", health="Salud (1-5)", absences="Ausencias", G1="Nota periodo 1",
+    G2="Nota periodo 2", G3="Nota final (objetivo)"
+  )
+  all_cols <- unique(c(names(df_mat), names(df_por)))
+  codebook_tbl <- tibble(variable = all_cols) %>%
+    mutate(descripcion = spanish_dict[variable]) %>%
+    mutate(descripcion = ifelse(is.na(descripcion), NA_character_, descripcion))
+}
+
+# Mostrar en 4 columnas (variable/descripcion como pares)
+n <- nrow(codebook_tbl)
+if (n > 0) {
+  rows_per_col <- ceiling(n / 4)
+  # dividir en 4 bloques por orden
+  idx <- rep(1:4, each = rows_per_col)[1:n]
+  blocks <- split(codebook_tbl, idx)
+  pad_block <- function(df) {
+    if (nrow(df) < rows_per_col) {
+      bind_rows(df, tibble(variable = rep(NA_character_, rows_per_col - nrow(df)),
+                           descripcion = rep(NA_character_, rows_per_col - nrow(df))))
+    } else df
+  }
+  blocks <- lapply(blocks, pad_block)
+  wide <- bind_cols(
+    blocks[[1]] %>% rename(variable1 = variable, desc1 = descripcion),
+    blocks[[2]] %>% rename(variable2 = variable, desc2 = descripcion),
+    blocks[[3]] %>% rename(variable3 = variable, desc3 = descripcion),
+    blocks[[4]] %>% rename(variable4 = variable, desc4 = descripcion)
+  ) %>% mutate_all(~replace_na(as.character(.), ""))
+  knitr::kable(wide, caption = "Tabla A9: Diccionario de columnas (4 columnas)", booktabs = TRUE) %>%
+    kable_styling(full_width = FALSE)
+} else {
+  cat("No hay columnas para mostrar.\n")
+}
 ```
 
 
