@@ -44,7 +44,8 @@ cat("student-por.csv:", file.exists("student-por.csv"), "\n")
 ```
 
 
-## 1) student_mat — Resumen numérico y missing
+## 1) Resumen numérico: missing, Outlier and Correlation (student_mat)
+A continuació se genera un resumen numerico del dataset **student_mat** reflejando estadisticamente valores que visualizan si es necesario imputar datos o limpiar registros en cuento a valores atipico o faltantes:
 
 ```{r mat-numeric}
 # Crear resumen numérico directamente a partir de student-mat.csv
@@ -68,38 +69,42 @@ if (nrow(df_mat) > 0) {
     arrange(variable)
 
   num_sum_mat_long %>%
-    kable(digits = 3, caption = "Resumen numérico — student_mat") %>%
+    kable(digits = 3, caption = "Tabla A5: Resumen numerico student_mat") %>%
     kable_styling(full_width = FALSE)
 } else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
+En el siguiente espacio se desea revisar toda la data **student_mat** con el fin de determinar si existen valores faltantes y asi iniciar un procedimiento de imputación de datos:
+
 ```{r mat-missing}
-# Tabla de valores faltantes por variable (student_mat)
+# Tabla de valores faltantes por variable (student_mat) — mostrar solo variables con missing > 0
 if (nrow(df_mat) > 0) {
   missing_mat <- df_mat %>%
     summarise(across(everything(), ~sum(is.na(.)))) %>%
     pivot_longer(everything(), names_to = "variable", values_to = "missing") %>%
     arrange(desc(missing))
 
-  missing_mat %>%
-    kable(digits = 0, caption = "Missing values — student_mat") %>%
-    kable_styling(full_width = FALSE)
+  missing_mat_filtered <- missing_mat %>% filter(missing > 0)
+
+  if (nrow(missing_mat_filtered) > 0) {
+    missing_mat_filtered %>%
+      kable(digits = 0, caption = "Missing values — student_mat (solo variables con missing)") %>%
+      kable_styling(full_width = FALSE)
+  } else {
+    cat("No se detectaron valores faltantes en student_mat.\n")
+  }
 } else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
+Y como se puede visualizar el codigo arroja que la data no contiene valores faltantes, por lo que continuaremos con la sigueinte sesion.
+
+### Boxplots y Correlación
+
+A continuacion se grafican las variables numericas graficos **Boxplots** para visualizar las diferentes variables que presentan alguna posible variacion atipica en su conjunto de valores, como se pueden ver en las variables: traveltime, studytime, G2, freetime, Fedu, famrel, failures, Dalc, age, y absences en la grafica A1:
 
 
-### Boxplots y distribución de G3 (student_mat)
-
-```{r mat-plots, fig.cap='Boxplots y histograma G3 (student_mat)'}
+```{r mat_plots}
 if (nrow(df_mat)>0) {
   library(ggplot2)
-  # Histograma G3
-  p1 <- ggplot(df_mat, aes(x = G3)) +
-    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
-    labs(title = "Distribución de G3 (student_mat)", x = "G3", y = "Frecuencia") +
-    theme_minimal()
-  print(p1)
-
   # Boxplots por variables numéricas
   nums <- df_mat %>% select(where(is.numeric))
   if (ncol(nums) > 0) {
@@ -107,32 +112,16 @@ if (nrow(df_mat)>0) {
     p2 <- ggplot(nums_long, aes(x = variable, y = value)) +
       geom_boxplot(outlier.size = 1, fill = "#74a9cf") +
       coord_flip() +
-      labs(title = "Boxplots variables numéricas (student_mat)") +
+      labs(title = "Grafica A1: Boxplots variables numéricas (student_mat)") +
       theme_minimal()
     print(p2)
-  }
-
-  # Mapa de correlación (numéricas)
-  nums <- df_mat %>% select(where(is.numeric))
-  if (ncol(nums) >= 2) {
-    cor_mat <- cor(nums, use = "pairwise.complete.obs")
-    cor_df <- as.data.frame(as.table(cor_mat))
-    p3 <- ggplot(cor_df, aes(Var1, Var2, fill = Freq)) +
-      geom_tile() +
-      scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-      theme_minimal() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Mapa de correlación (num) - student_mat") +
-      coord_fixed()
-    print(p3)
   }
 } else {
   cat("Archivo student-mat.csv no encontrado o vacío.\n")
 }
 ```
 
-
-## 2) student_mat — Outliers e correlaciones fuertes
+Aplicando la funcionalidad de detección de **Outliers** visualizamos en la sigueinte tabla (Tabla A4) la cantidad de valores que no se ajustan al rango o regla **IQR**.
 
 ```{r mat-outliers}
 # Detección de outliers por regla IQR para variables numéricas
@@ -150,10 +139,37 @@ if (nrow(df_mat) > 0) {
   })
 
   out_mat %>% filter(outlier_count > 0) %>%
-    kable(digits = 0, caption = "Outliers detectados (IQR) — student_mat") %>%
+    kable(digits = 0, caption = "Tabla A4: Outliers detectados (IQR) — student_mat") %>%
     kable_styling(full_width = FALSE)
 } else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
+
+En el siguiente grafico (Grafica A2) se realiza un grafico de correlación con las variables numericas con el fin de encontrar la posible relacion que puede existir en algunas variables tales como G1, G2, G3, Walc, Dalc, Fedu y Medu.
+
+```{r mat_correlacion}
+if (nrow(df_mat)>0) {
+  library(ggplot2)
+  # Mapa de correlación (numéricas)
+  nums <- df_mat %>% select(where(is.numeric))
+  if (ncol(nums) >= 2) {
+    cor_mat <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_mat))
+    p3 <- ggplot(cor_df, aes(Var1, Var2, fill = Freq)) +
+      geom_tile() +
+      scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(title = "Grafica A2: Mapa de correlación (num) - student_mat") +
+      coord_fixed()
+    print(p3)
+  }
+} else {
+  cat("Archivo student-mat.csv no encontrado o vacío.\n")
+}
+```
+
+
+Teniendo en cuenta aquellas que superan el parametro de correlaciones fuertes (|r|>=0.7) se tiene el siguiente listado:
 
 ```{r mat-strong}
 # Correlaciones fuertes |r| >= 0.7 (numéricas)
@@ -173,12 +189,31 @@ if (nrow(df_mat) > 0) {
   }
 
   if (nrow(strong_mat) > 0) {
-    strong_mat %>% kable(digits = 3, caption = "Correlaciones fuertes (|r|>=0.7) — student_mat") %>% kable_styling(full_width = FALSE)
+    strong_mat %>% kable(digits = 3, caption = "Tabla A3: Correlaciones fuertes (|r|>=0.7) — student_mat") %>% kable_styling(full_width = FALSE)
   } else cat("No se detectaron correlaciones fuertes (|r|>=0.7) en variables numéricas.\n")
 } else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
-```{r mat-scatter, fig.cap='Scatter G3 vs top correlates (student_mat)'}
+
+
+```{r Mat_Histograma_G3, eval=FALSE}
+  # Histograma G3
+if (nrow(df_mat)>0) {
+  library(ggplot2)
+  p1 <- ggplot(df_mat, aes(x = G3)) +
+    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
+    labs(title = "Distribución de G3 (student_mat)", x = "G3", y = "Frecuencia") +
+    theme_minimal()
+  print(p1)
+} else {
+  cat("Archivo student-mat.csv no encontrado o vacío.\n")
+}  
+```
+
+
+Para visualizar gráficamente las relaciones con mayor correlación (|r| notable), se muestran a continuación diagramas de dispersión entre G3 y cada variable relevante, junto con su línea de tendencia.
+
+```{r mat-scatter}
 if (nrow(df_mat)>0) {
   nums <- df_mat %>% select(where(is.numeric))
   if ("G3" %in% names(nums) && ncol(nums) >= 2) {
@@ -193,7 +228,7 @@ if (nrow(df_mat)>0) {
         geom_point(alpha = 0.6, size = 1.5, color = "#2b8cbe") +
         geom_smooth(method = "lm", se = FALSE, color = "red") +
         facet_wrap(~variable, scales = "free_x") +
-        labs(title = "G3 vs variables con mayor correlación (student_mat)") +
+        labs(title = "Grafico A6: G3 vs variables con mayor correlación (student_mat)") +
         theme_minimal()
       print(p4)
     }
@@ -201,6 +236,7 @@ if (nrow(df_mat)>0) {
 } else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
+De los variables evaluadas, únicamente G1 y G2 alcanzan una correlación aceptable con la nota final (G3), por lo que se recomiendan como predictores prioritarios en la regresión lineal simple.
 
 ## 3) student_por — Resumen numérico y missing
 
