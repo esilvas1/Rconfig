@@ -194,23 +194,6 @@ if (nrow(df_mat) > 0) {
 } else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
-
-
-```{r Mat_Histograma_G3, eval=FALSE}
-  # Histograma G3
-if (nrow(df_mat)>0) {
-  library(ggplot2)
-  p1 <- ggplot(df_mat, aes(x = G3)) +
-    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
-    labs(title = "Distribución de G3 (student_mat)", x = "G3", y = "Frecuencia") +
-    theme_minimal()
-  print(p1)
-} else {
-  cat("Archivo student-mat.csv no encontrado o vacío.\n")
-}  
-```
-
-
 Para visualizar gráficamente las relaciones con mayor correlación (|r| notable), se muestran a continuación diagramas de dispersión entre G3 y cada variable relevante, junto con su línea de tendencia.
 
 ```{r mat-scatter}
@@ -321,6 +304,24 @@ if (nrow(df_mat) > 0 && ncol(cat_vars) > 0) {
 
 Gráfico de barras faceteado: distribución por categoría para cada variable categórica (se agrupan las categorías de baja frecuencia como "Other"). Útil para identificar valores atípicos y desbalances en las categorías.
 De esta manera se puede visualizar que no existen variables atipicas en este conjunto de datos con respecto a las variables categoricas del dataset **student_mat**
+
+
+A continuación se construye un histograma de la variable objetivo (G3) para examinar su distribución y características principales (asimetría, multimodalidad, concentración y posibles valores extremos), con el fin de extraer conclusiones sobre su comportamiento antes del modelado.
+
+```{r Mat_Histograma_G3}
+# Histograma G3
+if (nrow(df_mat)>0) {
+  library(ggplot2)
+  p1 <- ggplot(df_mat, aes(x = G3)) +
+    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
+    labs(title = "Grafica A8: Distribución de G3 (student_mat)", x = "G3", y = "Frecuencia") +
+    theme_minimal()
+  print(p1)
+} else {
+  cat("Archivo student-mat.csv no encontrado o vacío.\n")
+}
+```
+
 
 ## 2) Resumen numérico: missing, Outlier and Correlation (student_por)
 
