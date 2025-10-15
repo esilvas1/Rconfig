@@ -238,7 +238,91 @@ if (nrow(df_mat)>0) {
 
 De los variables evaluadas, únicamente G1 y G2 alcanzan una correlación aceptable con la nota final (G3), por lo que se recomiendan como predictores prioritarios en la regresión lineal simple.
 
-## 3) student_por — Resumen numérico y missing
+Con el objetivo de analizar el comportamiento de las variables categóricas y detectar posibles valores atípicos, se presenta a continuación un gráfico que muestra la distribución de cada categoría.
+
+```{r mat-cat-bars-improved, fig.width=12, fig.height=10, echo=FALSE}
+library(ggplot2)
+library(forcats)
+library(scales)
+library(dplyr)
+
+cat_vars <- df_mat %>% select(where(~ is.character(.) || is.factor(.)))
+
+if (nrow(df_mat) > 0 && ncol(cat_vars) > 0) {
+
+  # Long format y conteo inicial
+  long_cat <- cat_vars %>%
+    mutate(across(everything(), ~ as.character(.))) %>%
+    pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+    filter(!is.na(value))
+
+  counts <- long_cat %>%
+    group_by(variable, value) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(variable) %>%
+    arrange(variable, desc(n)) %>%
+    mutate(rank = row_number()) %>%
+    ungroup()
+
+  # Agrupar categorías raras por variable (top 10 -> mostrar; resto -> "Other")
+  counts2 <- counts %>%
+    mutate(value2 = if_else(rank <= 10, value, "Other")) %>%
+    group_by(variable, value2) %>%
+    summarise(n = sum(n), .groups = "drop") %>%
+    group_by(variable) %>%
+    mutate(pct = n / sum(n) * 100) %>%
+    ungroup()
+
+  # Preparar factor reordenado dentro de cada facet
+  counts2 <- counts2 %>%
+    group_by(variable) %>%
+    mutate(value2 = fct_reorder2(value2, n, n)) %>%
+    ungroup()
+
+  # Plot: barras horizontales por variable (faceteado)
+  p <- ggplot(counts2, aes(x = value2, y = n, fill = pct)) +
+    geom_col(width = 0.7, show.legend = TRUE) +
+    geom_text(aes(label = paste0(ifelse(pct < 1, "<1", round(pct,1)), "%")), 
+              position = position_stack(vjust = 0.5), color = "white", size = 3) +
+    facet_wrap(~ variable, scales = "free_y", ncol = 2) +
+    coord_flip() +
+    scale_fill_viridis_c(option = "plasma", name = "Pct (%)") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    labs(title = "Grafico A7: Distribución de categorías — student_mat (top10 por variable; resto = Other)",
+         x = NULL, y = "Conteo") +
+    theme_minimal(base_size = 11) +
+    theme(strip.text = element_text(face = "bold", size = 10),
+          axis.text.y = element_text(size = 8),
+          legend.position = "right")
+
+  print(p)
+
+  # Tabla de categorías de baja frecuencia (umbral: pct < 2% o n < 5)
+  low_thresh_pct <- 2
+  low_thresh_n <- 5
+  low_counts <- counts2 %>%
+    filter(pct < low_thresh_pct | n < low_thresh_n) %>%
+    arrange(variable, pct)
+
+  if (nrow(low_counts) > 0) {
+    cat("\nCategorías de baja frecuencia (posibles atípicos):\n")
+    low_counts %>%
+      select(variable, value2, n, pct) %>%
+      distinct() %>%
+      knitr::kable(digits = 2, caption = "Categorías con baja frecuencia (student_mat)") %>%
+      kableExtra::kable_styling(full_width = FALSE)
+  } else {
+    cat("\nNo se encontraron categorías de baja frecuencia según el umbral (pct < ", low_thresh_pct, "% o n < ", low_thresh_n, ").\n", sep = "")
+  }
+} else {
+  cat("No hay variables categóricas en student_mat o el dataset está vacío.\n")
+}
+```
+
+Gráfico de barras faceteado: distribución por categoría para cada variable categórica (se agrupan las categorías de baja frecuencia como "Other"). Útil para identificar valores atípicos y desbalances en las categorías.
+De esta manera se puede visualizar que no existen variables atipicas en este conjunto de datos con respecto a las variables categoricas del dataset **student_mat**
+
+## 2) Resumen numérico: missing, Outlier and Correlation (student_por)
 
 ```{r por-numeric}
 # Crear resumen numérico directamente a partir de student-por.csv
