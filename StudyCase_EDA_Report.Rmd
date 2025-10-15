@@ -273,6 +273,20 @@ if (nrow(df_mat)>0) {
 
 De los variables evaluadas, únicamente G1 y G2 alcanzan una correlación aceptable con la nota final (G3), por lo que se recomiendan como predictores prioritarios en la regresión lineal simple.
 
+
+**Se debe imputar datos?**
+
+normalmente G1 y G2 son, por construcción del dataset, las notas previas y tienden a tener la correlación más alta con G3, Por lo que se prioriza la correlación con la variable objetivo (G3) para seleccionar predictores; por lo tanto variables con outliers pero sin correlación alta no se presentan como predictores en este caso.
+
+Actualmente en el proyecto los CSV no muestran valores faltantes (por eso median_imputed y mice_pooled no aportarían cambios útiles). Existen outliers detectados por IQR y se busca es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición. Winsorizar conserva el tamaño de la muestra y reduce el sesgo que los extremos causan en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
+
+Ahora para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
+
+Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, entonces los valores supuestos atipicos se dejaran de la forma en la que se encuentra en la data originalmente, teniendo en cuenta que los valores atipicos son posibles reales calificaciones.
+
+
+**Análisis Categorico**
+
 Con el objetivo de analizar el comportamiento de las variables categóricas y detectar posibles valores atípicos, se presenta a continuación un gráfico que muestra la distribución de cada categoría.
 
 ```{r mat-cat-bars-improved, fig.width=12, fig.height=10, echo=FALSE}
@@ -397,7 +411,11 @@ media ≈ 10.4, desviación estándar ≈ 4.6.
 
 **Recomendaciones preliminares:** proceder con regresión lineal simple usando G3, para ello se debe revisar influencias (outliers), heterocedasticidad.
 
-## 2) Resumen numérico: missing, Outlier and Correlation (student_por)
+## 2) Conclusiones del EDA (student_mat)
+
+Los datos de student_mat no requieren imputación: el dataset se encuentra limpio, sin valores faltantes relevantes y los valores extremos detectados son calificaciones plausibles dentro del rango 0–20 (no errores de entrada). Por tanto, se considera la muestra válida y lista para proceder con un modelo de regresión lineal simple.
+
+## 3) Resumen numérico: missing, Outlier and Correlation (student_por)
 
 ```{r por-numeric}
 # Crear resumen numérico directamente a partir de student-por.csv
