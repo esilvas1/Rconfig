@@ -417,6 +417,8 @@ Los datos de student_mat no requieren imputación: el dataset se encuentra limpi
 
 ## 3) Resumen numérico: missing, Outlier and Correlation (student_por)
 
+A continuació se genera un resumen numerico del dataset **student_por** reflejando estadisticamente valores que visualizan si es necesario imputar datos o limpiar registros en cuento a valores atipico o faltantes:
+
 ```{r por-numeric}
 # Crear resumen numérico directamente a partir de student-por.csv
 if (nrow(df_por) > 0) {
@@ -431,6 +433,7 @@ if (nrow(df_por) > 0) {
       missing = ~sum(is.na(.x))
     ), .names = "{.col}_{.fn}"))
 
+  # Convertir a formato largo para mostrar
   num_sum_por_long <- num_sum_por %>%
     pivot_longer(everything(), names_to = "metric", values_to = "value") %>%
     separate(metric, into = c("variable","stat"), sep = "_(?=[^_]+$)") %>%
@@ -438,38 +441,42 @@ if (nrow(df_por) > 0) {
     arrange(variable)
 
   num_sum_por_long %>%
-    kable(digits = 3, caption = "Resumen numérico — student_por") %>%
+    kable(digits = 3, caption = "Tabla B5: Resumen numerico student_mat") %>%
     kable_styling(full_width = FALSE)
-} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
+En el siguiente espacio se desea revisar toda la data **student_por** con el fin de determinar si existen valores faltantes y asi iniciar un procedimiento de imputación de datos:
+
 ```{r por-missing}
-# Tabla de valores faltantes por variable (student_por)
+# Tabla de valores faltantes por variable (student_por) — mostrar solo variables con missing > 0
 if (nrow(df_por) > 0) {
   missing_por <- df_por %>%
     summarise(across(everything(), ~sum(is.na(.)))) %>%
     pivot_longer(everything(), names_to = "variable", values_to = "missing") %>%
     arrange(desc(missing))
 
-  missing_por %>%
-    kable(digits = 0, caption = "Missing values — student_por") %>%
-    kable_styling(full_width = FALSE)
-} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+  missing_por_filtered <- missing_por %>% filter(missing > 0)
+
+  if (nrow(missing_por_filtered) > 0) {
+    missing_por_filtered %>%
+      kable(digits = 0, caption = "Missing values — student_mat (solo variables con missing)") %>%
+      kable_styling(full_width = FALSE)
+  } else {
+    cat("No se detectaron valores faltantes en student_mat.\n")
+  }
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
+Y como se puede visualizar el codigo arroja que la data no contiene valores faltantes, por lo que continuaremos con la sigueinte sesion.
+
+### Boxplots y Correlación
+
+A continuacion se grafican las variables numericas graficos **Boxplots** para visualizar las diferentes variables que presentan alguna posible variacion atipica en su conjunto de valores, como se pueden ver en las variables: Walc, traveltime, studytime, Medu, health, goout, G3, G2, G1, freetime, Fedu, famrel, failures, Dalc, age, y absences en la grafica B1:
 
 
-### Boxplots y distribución de G3 (student_por)
-
-```{r por-plots, fig.cap='Boxplots y histograma G3 (student_por)'}
+```{r por_plots}
 if (nrow(df_por)>0) {
   library(ggplot2)
-  # Histograma G3
-  p1 <- ggplot(df_por, aes(x = G3)) +
-    geom_histogram(binwidth = 1, fill = "#2c7fb8", color = "white") +
-    labs(title = "Distribución de G3 (student_por)", x = "G3", y = "Frecuencia") +
-    theme_minimal()
-  print(p1)
-
   # Boxplots por variables numéricas
   nums <- df_por %>% select(where(is.numeric))
   if (ncol(nums) > 0) {
@@ -477,35 +484,19 @@ if (nrow(df_por)>0) {
     p2 <- ggplot(nums_long, aes(x = variable, y = value)) +
       geom_boxplot(outlier.size = 1, fill = "#74a9cf") +
       coord_flip() +
-      labs(title = "Boxplots variables numéricas (student_por)") +
+      labs(title = "Grafica B1: Boxplots variables numéricas (student_por)") +
       theme_minimal()
     print(p2)
-  }
-
-  # Mapa de correlación (numéricas)
-  nums <- df_por %>% select(where(is.numeric))
-  if (ncol(nums) >= 2) {
-    cor_mat <- cor(nums, use = "pairwise.complete.obs")
-    cor_df <- as.data.frame(as.table(cor_mat))
-    p3 <- ggplot(cor_df, aes(Var1, Var2, fill = Freq)) +
-      geom_tile() +
-      scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-      theme_minimal() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Mapa de correlación (num) - student_por") +
-      coord_fixed()
-    print(p3)
   }
 } else {
   cat("Archivo student-por.csv no encontrado o vacío.\n")
 }
 ```
 
-
-## 4) student_por — Outliers y correlaciones fuertes
+Aplicando la funcionalidad de detección de **Outliers** visualizamos en la sigueinte tabla (Tabla B4) la cantidad de valores que no se ajustan al rango o regla **IQR**.
 
 ```{r por-outliers}
-# Detección de outliers por regla IQR para variables numéricas (student_por)
+# Detección de outliers por regla IQR para variables numéricas
 if (nrow(df_por) > 0) {
   nums <- df_por %>% select(where(is.numeric))
   out_por <- map_dfr(names(nums), function(var) {
@@ -520,19 +511,46 @@ if (nrow(df_por) > 0) {
   })
 
   out_por %>% filter(outlier_count > 0) %>%
-    kable(digits = 0, caption = "Outliers detectados (IQR) — student_por") %>%
+    kable(digits = 0, caption = "Tabla B4: Outliers detectados (IQR) — student_por") %>%
     kable_styling(full_width = FALSE)
-} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
+En el siguiente grafico (Grafica B2) se realiza un grafico de correlación con las variables numericas con el fin de encontrar la posible relacion que puede existir en algunas variables tales como G1, G2, G3, Walc, Dalc, Fedu y Medu.
+
+```{r por_correlacion}
+if (nrow(df_por)>0) {
+  library(ggplot2)
+  # Mapa de correlación (numéricas)
+  nums <- df_por %>% select(where(is.numeric))
+  if (ncol(nums) >= 2) {
+    cor_por <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_por))
+    p3 <- ggplot(cor_df, aes(Var1, Var2, fill = Freq)) +
+      geom_tile() +
+      scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(title = "Grafica B2: Mapa de correlación (num) - student_por") +
+      coord_fixed()
+    print(p3)
+  }
+} else {
+  cat("Archivo student-mat.csv no encontrado o vacío.\n")
+}
+```
+
+
+Teniendo en cuenta aquellas que superan el parametro de correlaciones fuertes (|r|>=0.7) se tiene el siguiente listado:
+
 ```{r por-strong}
-# Correlaciones fuertes |r| >= 0.7 (numéricas) para student_por
+# Correlaciones fuertes |r| >= 0.7 (numéricas)
 if (nrow(df_por) > 0) {
   nums <- df_por %>% select(where(is.numeric))
   strong_por <- tibble()
   if (ncol(nums) >= 2) {
-    cor_mat <- cor(nums, use = "pairwise.complete.obs")
-    cor_df <- as.data.frame(as.table(cor_mat))
+    cor_por <- cor(nums, use = "pairwise.complete.obs")
+    cor_df <- as.data.frame(as.table(cor_por))
     strong_por <- cor_df %>%
       filter(Var1 != Var2) %>%
       mutate(abs_r = abs(Freq)) %>%
@@ -543,12 +561,14 @@ if (nrow(df_por) > 0) {
   }
 
   if (nrow(strong_por) > 0) {
-    strong_por %>% kable(digits = 3, caption = "Correlaciones fuertes (|r|>=0.7) — student_por") %>% kable_styling(full_width = FALSE)
+    strong_por %>% kable(digits = 3, caption = "Tabla B3: Correlaciones fuertes (|r|>=0.7) — student_por") %>% kable_styling(full_width = FALSE)
   } else cat("No se detectaron correlaciones fuertes (|r|>=0.7) en variables numéricas.\n")
-} else cat("Archivo student-por.csv no encontrado o vacío.\n")
+} else cat("Archivo student-mat.csv no encontrado o vacío.\n")
 ```
 
-```{r por-scatter, fig.cap='Scatter G3 vs top correlates (student_por)'}
+Para visualizar gráficamente las relaciones con mayor correlación (|r| notable), se muestran a continuación diagramas de dispersión entre G3 y cada variable relevante, junto con su línea de tendencia.
+
+```{r por-scatter}
 if (nrow(df_por)>0) {
   nums <- df_por %>% select(where(is.numeric))
   if ("G3" %in% names(nums) && ncol(nums) >= 2) {
@@ -558,18 +578,158 @@ if (nrow(df_por)>0) {
       arrange(desc(abs(corr)))
     top_vars <- head(cor_with_G3$variable, 6)
     if (length(top_vars) > 0) {
-      scatter_df <- df_por %>% select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
+      scatter_df <- df_mat %>% select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
       p4 <- ggplot(scatter_df, aes(x = value, y = G3)) +
         geom_point(alpha = 0.6, size = 1.5, color = "#2b8cbe") +
         geom_smooth(method = "lm", se = FALSE, color = "red") +
         facet_wrap(~variable, scales = "free_x") +
-        labs(title = "G3 vs variables con mayor correlación (student_por)") +
+        labs(title = "Grafico B6: G3 vs variables con mayor correlación (student_por)") +
         theme_minimal()
       print(p4)
     }
   }
 } else cat("Archivo student-por.csv no encontrado o vacío.\n")
 ```
+
+De los variables evaluadas, únicamente G1 y G2 alcanzan una correlación aceptable con la nota final (G3), por lo que se recomiendan como predictores prioritarios en la regresión lineal simple.
+
+
+**Se debe imputar datos?**
+
+normalmente G1 y G2 son, por construcción del dataset, las notas previas y tienden a tener la correlación más alta con G3, Por lo que se prioriza la correlación con la variable objetivo (G3) para seleccionar predictores; por lo tanto variables con outliers pero sin correlación alta no se presentan como predictores en este caso.
+
+Actualmente en el proyecto los CSV no muestran valores faltantes (por eso median_imputed y mice_pooled no aportarían cambios útiles). Existen outliers detectados por IQR y se busca es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición. Winsorizar conserva el tamaño de la muestra y reduce el sesgo que los extremos causan en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
+
+Ahora para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
+
+Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, entonces los valores supuestos atipicos se dejaran de la forma en la que se encuentra en la data originalmente, teniendo en cuenta que los valores atipicos son posibles reales calificaciones.
+
+
+**Análisis Categorico**
+
+Con el objetivo de analizar el comportamiento de las variables categóricas y detectar posibles valores atípicos, se presenta a continuación un gráfico que muestra la distribución de cada categoría.
+
+```{r por-cat-bars-improved, fig.width=12, fig.height=10, echo=FALSE}
+library(ggplot2)
+library(forcats)
+library(scales)
+library(dplyr)
+
+cat_vars <- df_por %>% select(where(~ is.character(.) || is.factor(.)))
+
+if (nrow(df_por) > 0 && ncol(cat_vars) > 0) {
+
+  # Long format y conteo inicial
+  long_cat <- cat_vars %>%
+    mutate(across(everything(), ~ as.character(.))) %>%
+    pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+    filter(!is.na(value))
+
+  counts <- long_cat %>%
+    group_by(variable, value) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(variable) %>%
+    arrange(variable, desc(n)) %>%
+    mutate(rank = row_number()) %>%
+    ungroup()
+
+  # Agrupar categorías raras por variable (top 10 -> mostrar; resto -> "Other")
+  counts2 <- counts %>%
+    mutate(value2 = if_else(rank <= 10, value, "Other")) %>%
+    group_by(variable, value2) %>%
+    summarise(n = sum(n), .groups = "drop") %>%
+    group_by(variable) %>%
+    mutate(pct = n / sum(n) * 100) %>%
+    ungroup()
+
+  # Preparar factor reordenado dentro de cada facet
+  counts2 <- counts2 %>%
+    group_by(variable) %>%
+    mutate(value2 = fct_reorder2(value2, n, n)) %>%
+    ungroup()
+
+  # Plot: barras horizontales por variable (faceteado)
+  p <- ggplot(counts2, aes(x = value2, y = n, fill = pct)) +
+    geom_col(width = 0.7, show.legend = TRUE) +
+    geom_text(aes(label = paste0(ifelse(pct < 1, "<1", round(pct,1)), "%")), 
+              position = position_stack(vjust = 0.5), color = "white", size = 3) +
+    facet_wrap(~ variable, scales = "free_y", ncol = 2) +
+    coord_flip() +
+    scale_fill_viridis_c(option = "plasma", name = "Pct (%)") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    labs(title = "Grafico B7: Distribución de categorías — student_por (top10 por variable; resto = Other)",
+         x = NULL, y = "Conteo") +
+    theme_minimal(base_size = 11) +
+    theme(strip.text = element_text(face = "bold", size = 10),
+          axis.text.y = element_text(size = 8),
+          legend.position = "right")
+
+  print(p)
+
+  # Tabla de categorías de baja frecuencia (umbral: pct < 2% o n < 5)
+  low_thresh_pct <- 2
+  low_thresh_n <- 5
+  low_counts <- counts2 %>%
+    filter(pct < low_thresh_pct | n < low_thresh_n) %>%
+    arrange(variable, pct)
+
+  if (nrow(low_counts) > 0) {
+    cat("\nCategorías de baja frecuencia (posibles atípicos):\n")
+    low_counts %>%
+      select(variable, value2, n, pct) %>%
+      distinct() %>%
+      knitr::kable(digits = 2, caption = "Categorías con baja frecuencia (student_mat)") %>%
+      kableExtra::kable_styling(full_width = FALSE)
+  } else {
+    cat("\nNo se encontraron categorías de baja frecuencia según el umbral (pct < ", low_thresh_pct, "% o n < ", low_thresh_n, ").\n", sep = "")
+  }
+} else {
+  cat("No hay variables categóricas en student_por o el dataset está vacío.\n")
+}
+```
+
+Gráfico de barras faceteado: distribución por categoría para cada variable categórica (se agrupan las categorías de baja frecuencia como "Other"). Útil para identificar valores atípicos y desbalances en las categorías.
+De esta manera se puede visualizar que no existen variables atipicas en este conjunto de datos con respecto a las variables categoricas del dataset **student_por**
+
+
+A continuación se construye un histograma de la variable objetivo (G3) para examinar su distribución y características principales (asimetría, multimodalidad, concentración y posibles valores extremos), con el fin de extraer conclusiones sobre su comportamiento antes del modelado.
+
+
+```{r Por_Histograma_G3, fig.width=8, fig.height=4}
+if (nrow(df_por) > 0 && "G3" %in% names(df_por)) {
+  library(ggplot2)
+  g3 <- df_por$G3
+  g3 <- g3[!is.na(g3)]
+  if (length(g3) > 1 && sd(g3) > 0) {
+    mu <- mean(g3)
+    sigma <- sd(g3)
+    p1 <- ggplot(df_por, aes(x = G3)) +
+      geom_histogram(aes(y = ..density..), binwidth = 1, fill = "#2c7fb8", color = "white") +
+      stat_function(fun = dnorm, args = list(mean = mu, sd = sigma), color = "red", size = 1) +
+      geom_density(alpha = 0.15, fill = "red", color = NA) +  # opcional: densidad kernel
+      labs(title = "Grafica B8: Distribución de G3 (student_por)",
+           subtitle = paste0("Normal ajustada: μ=", round(mu,2), ", σ=", round(sigma,2)),
+           x = "G3", y = "Densidad") +
+      theme_minimal()
+    print(p1)
+  } else {
+    cat("G3 no tiene suficientes observaciones válidas o sd = 0.\n")
+  }
+} else {
+  cat("Archivo student-por.csv no encontrado, vacío o columna G3 ausente.\n")
+}
+```
+
+**Estadísticos mostrados:** 
+media ≈ 10.4, desviación estándar ≈ 4.6.
+
+**Forma general:** distribución aproximadamente unimodal con pico alrededor de calificaciones entre 9–11; la campana normal ajustada aproxima bien el centro pero no captura totalmente los extremos.
+
+**Desviaciones respecto a la normal:** presencia de valores muy bajos (cúmulo cercano a 0) y una cola derecha moderada — ligera asimetría/colas más pesadas que la normal.
+
+**Implicaciones para modelado:** la normalidad no es perfecta pero suficiente como punto de partida; se deben validar residuos tras ajustar el modelo.
+
+**Recomendaciones preliminares:** proceder con regresión lineal simple usando G3, para ello se debe revisar influencias (outliers), heterocedasticidad.
 
 
 # 5) Comparación entre datasets
@@ -604,11 +764,6 @@ En esta sección deberás redactar las conclusiones principales derivadas del ED
 
 
 ---
-
-**Cómo renderizar el informe**
-
-Si quieres generar el HTML localmente, en R ejecuta:
-
 ```r
 rmarkdown::render("StudyCase_EDA_Report.Rmd")
 ```
