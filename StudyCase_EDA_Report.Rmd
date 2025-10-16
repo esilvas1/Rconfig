@@ -7,6 +7,7 @@ output:
     toc: true
     toc_depth: 2
     code_folding: hide
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -34,7 +35,7 @@ df_por <- if (file.exists("student-por.csv")) readr::read_csv2("student-por.csv"
 Este informe contiene un análisis exploratorio de datos (EDA) para los conjuntos `student_mat.csv` y `student_por.csv`.Descargados de la url **https://archive.ics.uci.edu/dataset/320/student+performance**, Este informe incluye tablas descriptivas, identificación de valores faltantes, detección de outliers por la regla IQR, matrices y mapas de correlación, y gráficos de dispersión de la calificación o nota final de cada estudiante (G3) frente a las variables con mayor correlación.
 
 
-# Datos cargados
+# Aplicación: Análisis Exploratorio de Datos (EDA)
 Se descarga de la ubicacion URL mencionda anteriormente un archivo (*.zip) con el contenido de los datos en archivos (*.csv) como insumo de esta actividad, se realiza su respectivo analisis EDA y posterior aplicacion del Modelo de Regresion Lineal Simple, **Simple Lineal Regression Model (SLRM)**
 
 ```{r files-check}
@@ -96,7 +97,7 @@ if (n > 0) {
 ```
 
 
-## 1) Resumen numérico: missing, Outlier and Correlation (student_mat)
+## Resumen numérico: missing, Outlier and Correlation (student_mat)
 A continuació se genera un resumen numerico del dataset **student_mat** reflejando estadisticamente valores que visualizan si es necesario imputar datos o limpiar registros en cuento a valores atipico o faltantes:
 
 ```{r mat-numeric}
@@ -274,17 +275,6 @@ if (nrow(df_mat)>0) {
 De los variables evaluadas, únicamente G1 y G2 alcanzan una correlación aceptable con la nota final (G3), por lo que se recomiendan como predictores prioritarios en la regresión lineal simple.
 
 
-**Se debe imputar datos?**
-
-normalmente G1 y G2 son, por construcción del dataset, las notas previas y tienden a tener la correlación más alta con G3, Por lo que se prioriza la correlación con la variable objetivo (G3) para seleccionar predictores; por lo tanto variables con outliers pero sin correlación alta no se presentan como predictores en este caso.
-
-Actualmente en el proyecto los CSV no muestran valores faltantes (por eso median_imputed y mice_pooled no aportarían cambios útiles). Existen outliers detectados por IQR y se busca es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición. Winsorizar conserva el tamaño de la muestra y reduce el sesgo que los extremos causan en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
-
-Ahora para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
-
-Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, entonces los valores supuestos atipicos se dejaran de la forma en la que se encuentra en la data originalmente, teniendo en cuenta que los valores atipicos son posibles reales calificaciones.
-
-
 **Análisis Categorico**
 
 Con el objetivo de analizar el comportamiento de las variables categóricas y detectar posibles valores atípicos, se presenta a continuación un gráfico que muestra la distribución de cada categoría.
@@ -371,51 +361,7 @@ if (nrow(df_mat) > 0 && ncol(cat_vars) > 0) {
 Gráfico de barras faceteado: distribución por categoría para cada variable categórica (se agrupan las categorías de baja frecuencia como "Other"). Útil para identificar valores atípicos y desbalances en las categorías.
 De esta manera se puede visualizar que no existen variables atipicas en este conjunto de datos con respecto a las variables categoricas del dataset **student_mat**
 
-
-A continuación se construye un histograma de la variable objetivo (G3) para examinar su distribución y características principales (asimetría, multimodalidad, concentración y posibles valores extremos), con el fin de extraer conclusiones sobre su comportamiento antes del modelado.
-
-
-```{r Mat_Histograma_G3, fig.width=8, fig.height=4}
-if (nrow(df_mat) > 0 && "G3" %in% names(df_mat)) {
-  library(ggplot2)
-  g3 <- df_mat$G3
-  g3 <- g3[!is.na(g3)]
-  if (length(g3) > 1 && sd(g3) > 0) {
-    mu <- mean(g3)
-    sigma <- sd(g3)
-    p1 <- ggplot(df_mat, aes(x = G3)) +
-      geom_histogram(aes(y = ..density..), binwidth = 1, fill = "#2c7fb8", color = "white") +
-      stat_function(fun = dnorm, args = list(mean = mu, sd = sigma), color = "red", size = 1) +
-      geom_density(alpha = 0.15, fill = "red", color = NA) +  # opcional: densidad kernel
-      labs(title = "Grafica A8: Distribución de G3 (student_mat)",
-           subtitle = paste0("Normal ajustada: μ=", round(mu,2), ", σ=", round(sigma,2)),
-           x = "G3", y = "Densidad") +
-      theme_minimal()
-    print(p1)
-  } else {
-    cat("G3 no tiene suficientes observaciones válidas o sd = 0.\n")
-  }
-} else {
-  cat("Archivo student-mat.csv no encontrado, vacío o columna G3 ausente.\n")
-}
-```
-
-**Estadísticos mostrados:** 
-media ≈ 10.4, desviación estándar ≈ 4.6.
-
-**Forma general:** distribución aproximadamente unimodal con pico alrededor de calificaciones entre 9–11; la campana normal ajustada aproxima bien el centro pero no captura totalmente los extremos.
-
-**Desviaciones respecto a la normal:** presencia de valores muy bajos (cúmulo cercano a 0) y una cola derecha moderada — ligera asimetría/colas más pesadas que la normal.
-
-**Implicaciones para modelado:** la normalidad no es perfecta pero suficiente como punto de partida; se deben validar residuos tras ajustar el modelo.
-
-**Recomendaciones preliminares:** proceder con regresión lineal simple usando G3, para ello se debe revisar influencias (outliers), heterocedasticidad.
-
-## 2) Conclusiones del EDA (student_mat)
-
-Los datos de student_mat no requieren imputación: el dataset se encuentra limpio, sin valores faltantes relevantes y los valores extremos detectados son calificaciones plausibles dentro del rango 0–20 (no errores de entrada). Por tanto, se considera la muestra válida y lista para proceder con un modelo de regresión lineal simple.
-
-## 3) Resumen numérico: missing, Outlier and Correlation (student_por)
+## Resumen numérico: missing, Outlier and Correlation (student_por)
 
 A continuació se genera un resumen numerico del dataset **student_por** reflejando estadisticamente valores que visualizan si es necesario imputar datos o limpiar registros en cuento a valores atipico o faltantes:
 
@@ -593,18 +539,6 @@ if (nrow(df_por)>0) {
 
 De los variables evaluadas, únicamente G1 y G2 alcanzan una correlación aceptable con la nota final (G3), por lo que se recomiendan como predictores prioritarios en la regresión lineal simple.
 
-
-**Se debe imputar datos?**
-
-normalmente G1 y G2 son, por construcción del dataset, las notas previas y tienden a tener la correlación más alta con G3, Por lo que se prioriza la correlación con la variable objetivo (G3) para seleccionar predictores; por lo tanto variables con outliers pero sin correlación alta no se presentan como predictores en este caso.
-
-Actualmente en el proyecto los CSV no muestran valores faltantes (por eso median_imputed y mice_pooled no aportarían cambios útiles). Existen outliers detectados por IQR y se busca es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición. Winsorizar conserva el tamaño de la muestra y reduce el sesgo que los extremos causan en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
-
-Ahora para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
-
-Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, entonces los valores supuestos atipicos se dejaran de la forma en la que se encuentra en la data originalmente, teniendo en cuenta que los valores atipicos son posibles reales calificaciones.
-
-
 **Análisis Categorico**
 
 Con el objetivo de analizar el comportamiento de las variables categóricas y detectar posibles valores atípicos, se presenta a continuación un gráfico que muestra la distribución de cada categoría.
@@ -691,7 +625,49 @@ if (nrow(df_por) > 0 && ncol(cat_vars) > 0) {
 Gráfico de barras faceteado: distribución por categoría para cada variable categórica (se agrupan las categorías de baja frecuencia como "Other"). Útil para identificar valores atípicos y desbalances en las categorías.
 De esta manera se puede visualizar que no existen variables atipicas en este conjunto de datos con respecto a las variables categoricas del dataset **student_por**
 
+## Histograma de la variable objetivo G3 (student_mat)
 
+A continuación se construye un histograma de la variable objetivo (G3) para examinar su distribución y características principales (asimetría, multimodalidad, concentración y posibles valores extremos), con el fin de extraer conclusiones sobre su comportamiento antes del modelado.
+
+
+```{r Mat_Histograma_G3, fig.width=8, fig.height=4}
+if (nrow(df_mat) > 0 && "G3" %in% names(df_mat)) {
+  library(ggplot2)
+  g3 <- df_mat$G3
+  g3 <- g3[!is.na(g3)]
+  if (length(g3) > 1 && sd(g3) > 0) {
+    mu <- mean(g3)
+    sigma <- sd(g3)
+    p1 <- ggplot(df_mat, aes(x = G3)) +
+      geom_histogram(aes(y = ..density..), binwidth = 1, fill = "#2c7fb8", color = "white") +
+      stat_function(fun = dnorm, args = list(mean = mu, sd = sigma), color = "red", size = 1) +
+      geom_density(alpha = 0.15, fill = "red", color = NA) +  # opcional: densidad kernel
+      labs(title = "Grafica A8: Distribución de G3 (student_mat)",
+           subtitle = paste0("Normal ajustada: μ=", round(mu,2), ", σ=", round(sigma,2)),
+           x = "G3", y = "Densidad") +
+      theme_minimal()
+    print(p1)
+  } else {
+    cat("G3 no tiene suficientes observaciones válidas o sd = 0.\n")
+  }
+} else {
+  cat("Archivo student-mat.csv no encontrado, vacío o columna G3 ausente.\n")
+}
+```
+
+**Estadísticos mostrados:** 
+media ≈ 10.4, desviación estándar ≈ 4.6.
+
+**Forma general:** distribución aproximadamente unimodal con pico alrededor de calificaciones entre 9–11; la campana normal ajustada aproxima bien el centro pero no captura totalmente los extremos.
+
+**Desviaciones respecto a la normal:** presencia de valores muy bajos (cúmulo cercano a 0) y una cola derecha moderada — ligera asimetría/colas más pesadas que la normal.
+
+**Implicaciones para modelado:** la normalidad no es perfecta pero suficiente como punto de partida; se deben validar residuos tras ajustar el modelo.
+
+**Recomendaciones preliminares:** proceder con regresión lineal simple usando G3, para ello se debe revisar influencias (outliers), heterocedasticidad.
+
+
+## Histograma de la variable objetivo G3 (student_por)
 A continuación se construye un histograma de la variable objetivo (G3) para examinar su distribución y características principales (asimetría, multimodalidad, concentración y posibles valores extremos), con el fin de extraer conclusiones sobre su comportamiento antes del modelado.
 
 
@@ -721,9 +697,9 @@ if (nrow(df_por) > 0 && "G3" %in% names(df_por)) {
 ```
 
 **Estadísticos mostrados:** 
-media ≈ 10.4, desviación estándar ≈ 4.6.
+media ≈ 11.9, desviación estándar ≈ 3.2.
 
-**Forma general:** distribución aproximadamente unimodal con pico alrededor de calificaciones entre 9–11; la campana normal ajustada aproxima bien el centro pero no captura totalmente los extremos.
+**Forma general:** distribución aproximadamente unimodal con pico alrededor de calificaciones entre 10–11; la campana normal ajustada aproxima bien el centro pero no captura totalmente los extremos.
 
 **Desviaciones respecto a la normal:** presencia de valores muy bajos (cúmulo cercano a 0) y una cola derecha moderada — ligera asimetría/colas más pesadas que la normal.
 
@@ -731,8 +707,19 @@ media ≈ 10.4, desviación estándar ≈ 4.6.
 
 **Recomendaciones preliminares:** proceder con regresión lineal simple usando G3, para ello se debe revisar influencias (outliers), heterocedasticidad.
 
+## Conclusiones EDA 
 
-# 5) Comparación entre datasets
+Normalmente G1 y G2 son, por construcción del dataset, las notas previas y tienden a tener la correlación más alta con G3, Por lo que se prioriza la correlación con la variable objetivo (G3) para seleccionar predictores; por lo tanto variables con outliers pero sin correlación alta no se presentan como predictores en este caso.
+
+Actualmente en el proyecto los CSV no muestran valores faltantes (por eso median_imputed y mice_pooled no aportarían cambios útiles). Existen outliers detectados por IQR y se busca es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición. Winsorizar conserva el tamaño de la muestra y reduce el sesgo que los extremos causan en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
+
+Ahora para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
+
+Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, entonces los valores supuestos atipicos se dejaran de la forma en la que se encuentra en la data originalmente, teniendo en cuenta que los valores atipicos son posibles reales calificaciones.
+
+**Los datos de student_mat y student_por no requieren imputación**: los dataset se encuentran limpio, sin valores faltantes relevantes y los valores extremos detectados son calificaciones plausibles dentro del rango 0–20 (no errores de entrada). Por tanto, se considera las data válida y lista para proceder con un modelo de regresión lineal simple.
+
+### Comparación entre datasets
 
 ```{r compare-summary}
 # dimensiones y conteos de missing
@@ -753,9 +740,9 @@ comp_tab %>% kable(caption = "Comparación resumida entre datasets") %>% kable_s
 ```
 
 
-# 6) Conclusiones y siguientes pasos
+# Aplicación: Modelo de Regresión Lienal Simple (SLMR)
 
-En esta sección deberás redactar las conclusiones principales derivadas del EDA. A modo de ayuda, incluye:
+Incluye:
 
 - Variables con mayor correlación con `G3` (candidatas para regresión simple).
 - Variables con valores faltantes a priorizar.
