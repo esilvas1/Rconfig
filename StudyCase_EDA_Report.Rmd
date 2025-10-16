@@ -709,15 +709,17 @@ media ≈ 11.9, desviación estándar ≈ 3.2.
 
 ## Conclusiones EDA 
 
-Normalmente G1 y G2 son, por construcción del dataset, las notas previas y tienden a tener la correlación más alta con G3, Por lo que se prioriza la correlación con la variable objetivo (G3) para seleccionar predictores; por lo tanto variables con outliers pero sin correlación alta no se presentan como predictores en este caso.
+Actualmente en el proyecto los datos no muestran valores faltantes (por lo que en un caso hipotetico **median_imputed** y **mice_pooled** no aportarían cambios útiles). Existen outliers detectados por IQR y si se buscara es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición **Winsorizar** conservaría el tamaño de la muestra y reduciría el sesgo que los extremos causaría en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
 
-Actualmente en el proyecto los CSV no muestran valores faltantes (por eso median_imputed y mice_pooled no aportarían cambios útiles). Existen outliers detectados por IQR y se busca es reducir su influencia en la regresión sin eliminar observaciones ni introducir demasiada suposición. Winsorizar conserva el tamaño de la muestra y reduce el sesgo que los extremos causan en estimadores basados en la media y en OLS (Ordinary Least Squares / Mínimos Cuadrados Ordinarios)
+Ahora, para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
 
-Ahora para el caso que estamos estudiando de las calificaciones de los estudiantes y la prediccion de la variable de salida G3, ¿Es necesario imputar datos?, ¿Son realmente los valores atipicos valores regularmente no dados o imposibles de obtener en las calificaciones?
+Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, y basado en el análisis exploratorio realizado, se concluye que:
 
-Segun el documento de investigacion https://repositorium.sdum.uminho.pt/bitstream/1822/8024/1/student.pdf la calificación posible de un alumno oscila desde 0 hasta 20, entonces los valores supuestos atipicos se dejaran de la forma en la que se encuentra en la data originalmente, teniendo en cuenta que los valores atipicos son posibles reales calificaciones.
+**Calidad de los datos:** Las base de datos `student_mat` y `student_por` se encuentran limpia, sin valores faltantes relevantes y los valores extremos detectados corresponden a calificaciones plausibles dentro del rango académico 0-20, por lo que no requieren imputación o eliminación.
 
-**Los datos de student_mat y student_por no requieren imputación**: los dataset se encuentran limpio, sin valores faltantes relevantes y los valores extremos detectados son calificaciones plausibles dentro del rango 0–20 (no errores de entrada). Por tanto, se considera las data válida y lista para proceder con un modelo de regresión lineal simple.
+**Variables objetivo y predictores:** La variable `G3` (nota final) en amabos datasets presentan una distribución aproximadamente unimodal con ligera asimetría, siendo adecuada para modelado con regresión lineal. Las variables `G1` y `G2` en ambos datasets igualmente mostraron correlaciones más altas con `G3`, identificándose como los predictores más prometedores.
+
+**Preparación para modelado:** Los datos están listos para proceder con la aplicación de un modelo de regresión lineal simple, donde se evaluará la relación entre las notas previas y la calificación final.
 
 ### Comparación entre datasets
 
@@ -740,17 +742,547 @@ comp_tab %>% kable(caption = "Comparación resumida entre datasets") %>% kable_s
 ```
 
 
-# Aplicación: Modelo de Regresión Lienal Simple (SLMR)
+# Definición: Modelo de Regresión Lienal Simple (SLMR)
 
-Incluye:
+La **regresión lineal simple** es una técnica estadística que modela la relación lineal entre dos variables cuantitativas: una variable independiente o predictora (X) y una variable dependiente o respuesta (Y). Su objetivo es encontrar la mejor línea recta que describa la relación entre estas variables y permita realizar predicciones.
 
-- Variables con mayor correlación con `G3` (candidatas para regresión simple).
-- Variables con valores faltantes a priorizar.
-- Variables con outliers que requieren inspección.
-- Observaciones sobre la distribución de `G3` y posibles transformaciones.
+## Modelo Matemático
 
+El modelo de regresión lineal simple se expresa mediante la ecuación:
+
+$$Y_i = \beta_0 + \beta_1 X_i + \varepsilon_i$$
+
+Donde:
+- $Y_i$ = variable dependiente (respuesta) para la observación i
+- $X_i$ = variable independiente (predictora) para la observación i  
+- $\beta_0$ = intercepto (ordenada al origen)
+- $\beta_1$ = pendiente (coeficiente de regresión)
+- $\varepsilon_i$ = término de error aleatorio
+
+## Estimación por Mínimos Cuadrados Ordinarios (OLS)
+
+Los parámetros $\beta_0$ y $\beta_1$ se estiman minimizando la suma de cuadrados de los residuos:
+
+$$\min \sum_{i=1}^{n} (Y_i - \hat{Y_i})^2 = \min \sum_{i=1}^{n} (Y_i - \beta_0 - \beta_1 X_i)^2$$
+
+Las fórmulas de estimación son:
+
+$$\hat{\beta_1} = \frac{\sum_{i=1}^{n}(X_i - \bar{X})(Y_i - \bar{Y})}{\sum_{i=1}^{n}(X_i - \bar{X})^2}$$
+
+$$\hat{\beta_0} = \bar{Y} - \hat{\beta_1}\bar{X}$$
+
+## Supuestos del Modelo
+
+Para que la regresión lineal simple sea válida, deben cumplirse los siguientes supuestos:
+
+1. **Linealidad**: La relación entre X e Y es lineal
+2. **Independencia**: Las observaciones son independientes
+3. **Homocedasticidad**: La varianza de los errores es constante
+4. **Normalidad**: Los errores siguen una distribución normal
+5. **No multicolinealidad**: (No aplica en regresión simple)
+
+## Métricas de Evaluación
+
+- **Coeficiente de Determinación (R²)**: Proporción de variabilidad de Y explicada por X
+  $$R^2 = \frac{\text{Variabilidad Explicada}}{\text{Variabilidad Total}} = \frac{SSR}{SST}$$
+
+- **Error Estándar Residual**: Medida de dispersión de los residuos
+  $$s = \sqrt{\frac{\sum_{i=1}^{n}(Y_i - \hat{Y_i})^2}{n-2}}$$
+
+## Interpretación de Coeficientes
+
+- **$\hat{\beta_0}$**: Valor esperado de Y cuando X = 0
+- **$\hat{\beta_1}$**: Cambio promedio en Y por cada unidad de incremento en X
+
+
+# Aplicación: Regresión Lineal Simple (student_mat)
+
+En nuestro análisis del dataset `student_mat`, aplicamos regresión lineal simple para modelar la relación entre las calificaciones previas (G1 o G2) y la nota final (G3), permitiendo predecir el rendimiento académico final basado en el desempeño previo del estudiante.
+
+
+## Selección de Variables Predictoras
+
+Se identifican y seleccionan las variables con mayor poder predictivo basándose en las correlaciones calculadas en el EDA. Este paso es fundamental para construir un modelo moderado y efectivo.
+
+```{r slr-variable-selection, results='asis'}
+# Selección de variables predictoras basada en correlación con G3
+if (nrow(df_mat) > 0) {
+  library(dplyr)
+  library(knitr)
+  
+  # Calcular correlaciones con G3 para todas las variables numéricas
+  nums <- df_mat %>% select(where(is.numeric))
+  
+  if ("G3" %in% names(nums)) {
+    cor_with_g3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
+    
+    # Crear tabla ordenada de correlaciones
+    cor_table <- tibble(
+      variable = rownames(cor_with_g3),
+      correlacion = as.numeric(cor_with_g3[,1])
+    ) %>%
+      filter(variable != "G3") %>%
+      arrange(desc(abs(correlacion))) %>%
+      mutate(
+        correlacion = round(correlacion, 4),
+        abs_correlacion = round(abs(correlacion), 4)
+      )
+    
+    # Mostrar tabla de correlaciones
+    cor_table %>%
+      head(10) %>%
+      kable(caption = "Tabla 7.1: Variables numéricas ordenadas por correlación con G3", 
+            format = "html") %>%
+      kable_styling(full_width = FALSE, 
+                    bootstrap_options = c("striped", "hover", "condensed")) %>%
+      cat()
+    
+    # Identificar el mejor predictor
+    best_predictor <- cor_table$variable[1]
+    best_correlation <- cor_table$correlacion[1]
+    
+    cat("\n Por lo tanto, la variable seleccionada para la regresión es:", best_predictor, 
+        "\n con una correlación de:", round(best_correlation, 4), "\n con respecto a G3")
+  }
+} else {
+  cat("Dataset student_mat no disponible para análisis.")
+}
+```
+
+## Visualización de la Relación Lineal
+
+Antes del ajuste formal, se explora visualmente la relación entre el predictor seleccionado y la variable objetivo para confirmar la adequacidad de un modelo lineal y identificar posibles patrones o valores influyentes.
+
+```{r slr-scatter-plot, fig.width=8, fig.height=6}
+# Gráfico de dispersión con línea de tendencia
+if (nrow(df_mat) > 0 && exists("best_predictor")) {
+  library(ggplot2)
+  
+  # Crear el gráfico de dispersión
+  p_scatter <- ggplot(df_mat, aes_string(x = best_predictor, y = "G3")) +
+    geom_point(alpha = 0.6, size = 2, color = "#2b8cbe") +
+    geom_smooth(method = "lm", se = TRUE, color = "red", fill = "pink", alpha = 0.3) +
+    labs(
+      title = paste("Gráfico 7.1: Relación entre", best_predictor, "y G3"),
+      subtitle = paste("Correlación r =", round(best_correlation, 4)),
+      x = paste(best_predictor, "(Variable Predictora)"),
+      y = "G3 (Nota Final)"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 12),
+      axis.title = element_text(size = 11)
+    )
+  
+  print(p_scatter)
+  
+  # Estadísticas descriptivas de ambas variables
+  stats_table <- df_mat %>%
+    select(all_of(c(best_predictor, "G3"))) %>%
+    summarise(
+      across(everything(), list(
+        n = ~sum(!is.na(.)),
+        media = ~round(mean(., na.rm = TRUE), 2),
+        sd = ~round(sd(., na.rm = TRUE), 2),
+        min = ~min(., na.rm = TRUE),
+        max = ~max(., na.rm = TRUE)
+      ), .names = "{.col}_{.fn}")
+    ) %>%
+    pivot_longer(everything(), names_to = "stat", values_to = "value") %>%
+    separate(stat, into = c("variable", "estadistico"), sep = "_(?=[^_]+$)") %>%
+    pivot_wider(names_from = estadistico, values_from = value)
+  
+  stats_table %>%
+    kable(caption = "Tabla 7.2: Estadísticas descriptivas de las variables del modelo") %>%
+    kable_styling(full_width = FALSE)
+  
+} else {
+  cat("No se puede generar el gráfico: datos o predictor no disponibles.")
+}
+```
+
+## Ajuste del Modelo de Regresión Lineal Simple
+
+Se ajusta el modelo de regresión lineal simple utilizando mínimos cuadrados ordinarios (OLS) y se extraen los coeficientes principales junto con sus medidas de significancia estadística.
+
+```{r slr-model-fit}
+# Ajuste del modelo de regresión lineal simple
+if (nrow(df_mat) > 0 && exists("best_predictor")) {
+  library(broom)
+  
+  # Crear fórmula del modelo
+  formula_str <- paste("G3 ~", best_predictor)
+  model_formula <- as.formula(formula_str)
+  
+  # Ajustar el modelo
+  slr_model <- lm(model_formula, data = df_mat)
+  
+  # Resumen del modelo
+  model_summary <- summary(slr_model)
+  
+  # Extraer coeficientes usando broom para formato tidy
+  coefficients_table <- tidy(slr_model) %>%
+    mutate(
+      estimate = round(estimate, 4),
+      std.error = round(std.error, 4),
+      statistic = round(statistic, 3),
+      p.value = ifelse(p.value < 0.001, "< 0.001", round(p.value, 4))
+    ) %>%
+    rename(
+      Término = term,
+      Coeficiente = estimate,
+      `Error Estándar` = std.error,
+      `Estadístico t` = statistic,
+      `Valor p` = p.value
+    )
+  
+  # Mostrar tabla de coeficientes
+  coefficients_table %>%
+    kable(caption = "Tabla 7.3: Coeficientes del modelo de regresión lineal simple") %>%
+    kable_styling(full_width = FALSE)
+  
+  # Métricas de bondad de ajuste
+  model_metrics <- tibble(
+    Métrica = c("R-cuadrado", "R-cuadrado ajustado", "Error estándar residual", "Estadístico F", "Valor p del modelo"),
+    Valor = c(
+      round(model_summary$r.squared, 4),
+      round(model_summary$adj.r.squared, 4),
+      round(model_summary$sigma, 4),
+      round(model_summary$fstatistic[1], 3),
+      ifelse(pf(model_summary$fstatistic[1], model_summary$fstatistic[2], model_summary$fstatistic[3], lower.tail = FALSE) < 0.001, 
+             "< 0.001", 
+             round(pf(model_summary$fstatistic[1], model_summary$fstatistic[2], model_summary$fstatistic[3], lower.tail = FALSE), 4))
+    )
+  )
+  
+  model_metrics %>%
+    kable(caption = "Tabla 7.4: Métricas de bondad de ajuste del modelo") %>%
+    kable_styling(full_width = FALSE)
+  
+  # Ecuación del modelo
+  intercept <- round(coefficients(slr_model)[1], 4)
+  slope <- round(coefficients(slr_model)[2], 4)
+  
+  cat("\n**Ecuación del modelo ajustado:**")
+  cat("\nG3 =", intercept, "+", slope, "×", best_predictor)
+  cat("\n\n**Interpretación:**")
+  cat("\n- Por cada unidad adicional en", best_predictor, ", G3 aumenta en promedio", slope, "puntos")
+  cat("\n- El modelo explica", round(model_summary$r.squared * 100, 2), "% de la variabilidad en G3")
+  
+} else {
+  cat("No se puede ajustar el modelo: datos o predictor no disponibles.")
+}
+```
+
+## Validación de Supuestos del Modelo
+
+Se verifican los supuestos fundamentales de la regresión lineal: linealidad, homocedasticidad, normalidad de residuos e independencia. Esta validación es crucial para confirmar la validez de las inferencias estadísticas.
+
+```{r slr-assumptions, fig.width=12, fig.height=8}
+# Validación de supuestos del modelo
+if (exists("slr_model")) {
+  library(ggplot2)
+  library(gridExtra)
+  
+  # Calcular residuos y valores ajustados
+  model_data <- augment(slr_model)
+  
+  # 1. Gráfico de residuos vs valores ajustados (homocedasticidad y linealidad)
+  p1 <- ggplot(model_data, aes(x = .fitted, y = .resid)) +
+    geom_point(alpha = 0.6, color = "#2b8cbe") +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_smooth(method = "loess", se = FALSE, color = "orange") +
+    labs(
+      title = "Residuos vs Valores Ajustados",
+      subtitle = "Evaluación de linealidad y homocedasticidad",
+      x = "Valores Ajustados",
+      y = "Residuos"
+    ) +
+    theme_minimal()
+  
+  # 2. Q-Q plot para normalidad de residuos
+  p2 <- ggplot(model_data, aes(sample = .resid)) +
+    stat_qq(alpha = 0.6, color = "#2b8cbe") +
+    stat_qq_line(color = "red") +
+    labs(
+      title = "Q-Q Plot de Residuos",
+      subtitle = "Evaluación de normalidad",
+      x = "Cuantiles Teóricos",
+      y = "Cuantiles de Residuos"
+    ) +
+    theme_minimal()
+  
+  # 3. Histograma de residuos
+  p3 <- ggplot(model_data, aes(x = .resid)) +
+    geom_histogram(aes(y = ..density..), bins = 20, fill = "#2b8cbe", alpha = 0.7, color = "white") +
+    geom_density(color = "red", size = 1) +
+    stat_function(fun = dnorm, args = list(mean = mean(model_data$.resid), sd = sd(model_data$.resid)), 
+                  color = "orange", linetype = "dashed", size = 1) +
+    labs(
+      title = "Distribución de Residuos",
+      subtitle = "Comparación con distribución normal",
+      x = "Residuos",
+      y = "Densidad"
+    ) +
+    theme_minimal()
+  
+  # 4. Gráfico de distancia de Cook
+  p4 <- ggplot(model_data, aes(x = seq_along(.cooksd), y = .cooksd)) +
+    geom_point(alpha = 0.6, color = "#2b8cbe") +
+    geom_hline(yintercept = 4/nrow(model_data), color = "red", linetype = "dashed") +
+    labs(
+      title = "Distancia de Cook",
+      subtitle = "Identificación de observaciones influyentes",
+      x = "Índice de Observación",
+      y = "Distancia de Cook"
+    ) +
+    theme_minimal()
+  
+  # Combinar gráficos
+  grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2,
+               top = "Gráfico 7.2: Diagnósticos del modelo de regresión lineal simple")
+  
+  # Pruebas formales de supuestos
+  cat("\n**Pruebas estadísticas de supuestos:**\n")
+  
+  # Test de Shapiro-Wilk para normalidad (si n <= 5000)
+  if (length(residuals(slr_model)) <= 5000) {
+    shapiro_test <- shapiro.test(residuals(slr_model))
+    cat("Normalidad de residuos (Shapiro-Wilk):")
+    cat("\n  W =", round(shapiro_test$statistic, 4))
+    cat("\n  p-valor =", ifelse(shapiro_test$p.value < 0.001, "< 0.001", round(shapiro_test$p.value, 4)))
+    cat("\n  Interpretación:", ifelse(shapiro_test$p.value > 0.05, "No rechazar normalidad", "Rechazar normalidad"))
+  }
+  
+  # Test de Breusch-Pagan para homocedasticidad (requiere lmtest)
+  if (requireNamespace("lmtest", quietly = TRUE)) {
+    library(lmtest)
+    bp_test <- bptest(slr_model)
+    cat("\n\nHomocedasticidad (Breusch-Pagan):")
+    cat("\n  BP =", round(bp_test$statistic, 4))
+    cat("\n  p-valor =", ifelse(bp_test$p.value < 0.001, "< 0.001", round(bp_test$p.value, 4)))
+    cat("\n  Interpretación:", ifelse(bp_test$p.value > 0.05, "No rechazar homocedasticidad", "Rechazar homocedasticidad"))
+  }
+  
+  # Identificar observaciones influyentes
+  influential_obs <- which(model_data$.cooksd > 4/nrow(model_data))
+  
+  if (length(influential_obs) > 0) {
+    cat("\n\nObservaciones influyentes (Distancia de Cook > 4/n):")
+    cat("\n  Observaciones:", paste(influential_obs, collapse = ", "))
+    cat("\n  Total:", length(influential_obs), "de", nrow(model_data), "observaciones")
+  } else {
+    cat("\n\nNo se detectaron observaciones influyentes significativas.")
+  }
+  
+} else {
+  cat("Modelo no disponible para validación de supuestos.")
+}
+```
+
+## Análisis de Residuos y Predicciones
+
+Se realiza un análisis detallado de los residuos para evaluar la calidad del ajuste y se generan predicciones con sus respectivos intervalos de confianza.
+
+```{r slr-predictions}
+# Análisis de residuos y predicciones
+if (exists("slr_model")) {
+  
+  # Estadísticas de residuos
+  residuos <- residuals(slr_model)
+  residuos_stats <- tibble(
+    Estadística = c("Media", "Desviación Estándar", "Mínimo", "Q1", "Mediana", "Q3", "Máximo"),
+    Valor = c(
+      round(mean(residuos), 4),
+      round(sd(residuos), 4),
+      round(min(residuos), 4),
+      round(quantile(residuos, 0.25), 4),
+      round(median(residuos), 4),
+      round(quantile(residuos, 0.75), 4),
+      round(max(residuos), 4)
+    )
+  )
+  
+  residuos_stats %>%
+    kable(caption = "Tabla 7.5: Estadísticas descriptivas de los residuos") %>%
+    kable_styling(full_width = FALSE)
+  
+  # Generar predicciones con intervalos de confianza
+  pred_data <- tibble(!!sym(best_predictor) := seq(min(df_mat[[best_predictor]], na.rm = TRUE),
+                                                    max(df_mat[[best_predictor]], na.rm = TRUE),
+                                                    length.out = 50))
+  
+  predictions <- predict(slr_model, newdata = pred_data, interval = "confidence", level = 0.95)
+  pred_results <- bind_cols(pred_data, as_tibble(predictions))
+  
+  # Gráfico de predicciones con intervalos de confianza
+  p_pred <- ggplot() +
+    # Datos originales
+    geom_point(data = df_mat, aes_string(x = best_predictor, y = "G3"), 
+               alpha = 0.6, size = 2, color = "#2b8cbe") +
+    # Línea de regresión
+    geom_line(data = pred_results, aes_string(x = best_predictor, y = "fit"), 
+              color = "red", size = 1) +
+    # Intervalos de confianza
+    geom_ribbon(data = pred_results, aes_string(x = best_predictor, ymin = "lwr", ymax = "upr"), 
+                alpha = 0.2, fill = "red") +
+    labs(
+      title = "Gráfico 7.3: Modelo ajustado con intervalos de confianza",
+      subtitle = paste("IC del 95% para la media de G3 dado", best_predictor),
+      x = paste(best_predictor, "(Variable Predictora)"),
+      y = "G3 (Nota Final)"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 12)
+    )
+  
+  print(p_pred)
+  
+  # Tabla de predicciones ejemplo
+  ejemplo_valores <- c(
+    round(quantile(df_mat[[best_predictor]], c(0.1, 0.25, 0.5, 0.75, 0.9), na.rm = TRUE))
+  )
+  
+  pred_ejemplo <- predict(slr_model, 
+                          newdata = tibble(!!sym(best_predictor) := ejemplo_valores), 
+                          interval = "prediction", level = 0.95)
+  
+  ejemplo_table <- tibble(
+    !!sym(paste(best_predictor, "(Valor)")) := ejemplo_valores,
+    `G3 Predicho` = round(pred_ejemplo[,"fit"], 2),
+    `Límite Inferior (95%)` = round(pred_ejemplo[,"lwr"], 2),
+    `Límite Superior (95%)` = round(pred_ejemplo[,"upr"], 2)
+  )
+  
+  ejemplo_table %>%
+    kable(caption = paste("Tabla 7.6: Ejemplos de predicción con intervalos del 95%")) %>%
+    kable_styling(full_width = FALSE)
+  
+} else {
+  cat("Modelo no disponible para generar predicciones.")
+}
+```
+
+## Interpretación Final y Conclusiones del Modelo
+
+Se presenta una síntesis completa de los resultados obtenidos, incluyendo la interpretación práctica de los coeficientes, la evaluación de la calidad del modelo y las recomendaciones para su uso.
+
+```{r slr-conclusions}
+# Interpretación final y conclusiones
+if (exists("slr_model")) {
+  
+  cat("**CONCLUSIONES DEL MODELO DE REGRESIÓN LINEAL SIMPLE**\n")
+  cat(paste(rep("=", 60), collapse = ""), "\n\n")
+  
+  # Información del modelo
+  model_summary <- summary(slr_model)
+  intercept <- round(coefficients(slr_model)[1], 4)
+  slope <- round(coefficients(slr_model)[2], 4)
+  r_squared <- round(model_summary$r.squared, 4)
+  adj_r_squared <- round(model_summary$adj.r.squared, 4)
+  
+  cat("**1. MODELO AJUSTADO:**\n")
+  cat("   Ecuación: G3 =", intercept, "+", slope, "×", best_predictor, "\n")
+  cat("   Variable predictora:", best_predictor, "\n")
+  cat("   Variable respuesta: G3 (Nota Final)\n\n")
+  
+  cat("**2. CALIDAD DEL AJUSTE:**\n")
+  cat("   R² =", r_squared, "(", round(r_squared * 100, 2), "% de variabilidad explicada)\n")
+  cat("   R² ajustado =", adj_r_squared, "\n")
+  cat("   Error estándar residual =", round(model_summary$sigma, 4), "\n\n")
+  
+  cat("**3. SIGNIFICANCIA ESTADÍSTICA:**\n")
+  coef_pvalue <- summary(slr_model)$coefficients[2, 4]
+  cat("   Coeficiente de", best_predictor, ":", 
+      ifelse(coef_pvalue < 0.001, "altamente significativo (p < 0.001)", 
+             paste("significativo (p =", round(coef_pvalue, 4), ")")), "\n")
+  
+  f_pvalue <- pf(model_summary$fstatistic[1], model_summary$fstatistic[2], model_summary$fstatistic[3], lower.tail = FALSE)
+  cat("   Modelo global:", 
+      ifelse(f_pvalue < 0.001, "altamente significativo (p < 0.001)", 
+             paste("significativo (p =", round(f_pvalue, 4), ")")), "\n\n")
+  
+  cat("**4. INTERPRETACIÓN PRÁCTICA:**\n")
+  cat("   - Por cada punto adicional en", best_predictor, ", la nota final (G3)")
+  cat(ifelse(slope > 0, " aumenta ", " disminuye "))
+  cat("en promedio", abs(slope), "puntos\n")
+  
+  cat("   - El modelo predice que un estudiante con", best_predictor, "= 0 tendría")
+  cat(" una nota final de", intercept, "puntos (intercepción)\n")
+  
+  cat("   - La correlación observada (r =", round(sqrt(r_squared), 4), ") indica una relación")
+  if (sqrt(r_squared) >= 0.7) {
+    cat(" fuerte")
+  } else if (sqrt(r_squared) >= 0.5) {
+    cat(" moderada")
+  } else {
+    cat(" débil a moderada")
+  }
+  cat(" entre las variables\n\n")
+  
+  cat("**5. VALIDACIÓN DE SUPUESTOS:**\n")
+  
+  # Verificar supuestos
+  supuestos_ok <- TRUE
+  
+  # Shapiro-Wilk si aplica
+  if (length(residuals(slr_model)) <= 5000) {
+    shapiro_p <- shapiro.test(residuals(slr_model))$p.value
+    cat("   - Normalidad de residuos:", 
+        ifelse(shapiro_p > 0.05, "CUMPLE", "NO CUMPLE"), 
+        "(Shapiro-Wilk p =", round(shapiro_p, 4), ")\n")
+    if (shapiro_p <= 0.05) supuestos_ok <- FALSE
+  }
+  
+  # Breusch-Pagan si está disponible
+  if (requireNamespace("lmtest", quietly = TRUE)) {
+    bp_p <- lmtest::bptest(slr_model)$p.value
+    cat("   - Homocedasticidad:", 
+        ifelse(bp_p > 0.05, "CUMPLE", "NO CUMPLE"), 
+        "(Breusch-Pagan p =", round(bp_p, 4), ")\n")
+    if (bp_p <= 0.05) supuestos_ok <- FALSE
+  }
+  
+  # Observaciones influyentes
+  cooksd <- cooks.distance(slr_model)
+  influential_count <- sum(cooksd > 4/length(cooksd))
+  cat("   - Observaciones influyentes:", influential_count, "de", length(cooksd), 
+      ifelse(influential_count <= 0.05 * length(cooksd), "(ACEPTABLE)", "(REVISAR)"), "\n\n")
+  
+  cat("**6. RECOMENDACIONES:**\n")
+  
+  if (r_squared >= 0.5 && supuestos_ok) {
+    cat("   ✓ El modelo es APROPIADO para predicción con las siguientes características:\n")
+    cat("     - Poder predictivo", ifelse(r_squared >= 0.7, "alto", "moderado"), "\n")
+    cat("     - Cumple supuestos estadísticos\n")
+    cat("     - Relación significativa entre variables\n")
+  } else if (r_squared >= 0.3) {
+    cat("   ⚠ El modelo es ÚTIL pero con limitaciones:\n")
+    if (r_squared < 0.5) cat("     - Poder predictivo limitado (R² < 0.5)\n")
+    if (!supuestos_ok) cat("     - Algunos supuestos no se cumplen completamente\n")
+    cat("     - Considerar variables adicionales o transformaciones\n")
+  } else {
+    cat("   ✗ El modelo tiene LIMITACIONES importantes:\n")
+    cat("     - Bajo poder predictivo (R² < 0.3)\n")
+    cat("     - Buscar variables predictoras más relevantes\n")
+    cat("     - Considerar modelos más complejos\n")
+  }
+  
+  cat("\n**7. USO PRÁCTICO:**\n")
+  cat("   Para predecir G3 de un nuevo estudiante, use la ecuación:\n")
+  cat("   G3_predicho =", intercept, "+", slope, "× valor_de_", best_predictor, "\n")
+  cat("   (Considere los intervalos de predicción para incertidumbre)\n")
+  
+} else {
+  cat("Modelo no disponible para generar conclusiones.")
+}
+```
 
 ---
+
 ```r
 rmarkdown::render("StudyCase_EDA_Report.Rmd")
 ```
