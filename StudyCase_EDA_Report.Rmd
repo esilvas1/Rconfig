@@ -853,7 +853,7 @@ if (nrow(df_mat) > 0) {
 
 Antes del ajuste formal, se explora visualmente la relación entre el predictor seleccionado y la variable objetivo para confirmar la adequacidad de un modelo lineal y identificar posibles patrones o valores influyentes.
 
-```{r slr-scatter-plot, fig.width=8, fig.height=6}
+```{r slr-scatter-plot, fig.width=8, fig.height=6, results='asis'}
 # Gráfico de dispersión con línea de tendencia
 if (nrow(df_mat) > 0 && exists("best_predictor")) {
   library(ggplot2)
@@ -894,8 +894,11 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
     pivot_wider(names_from = estadistico, values_from = value)
   
   stats_table %>%
-    kable(caption = "Tabla 7.2: Estadísticas descriptivas de las variables del modelo") %>%
-    kable_styling(full_width = FALSE)
+    kable(caption = "Tabla 7.2: Estadísticas descriptivas de las variables del modelo", 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
   
 } else {
   cat("No se puede generar el gráfico: datos o predictor no disponibles.")
@@ -906,7 +909,7 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
 
 Se ajusta el modelo de regresión lineal simple utilizando mínimos cuadrados ordinarios (OLS) y se extraen los coeficientes principales junto con sus medidas de significancia estadística.
 
-```{r slr-model-fit}
+```{r slr-model-fit, results='asis'}
 # Ajuste del modelo de regresión lineal simple
 if (nrow(df_mat) > 0 && exists("best_predictor")) {
   library(broom)
@@ -939,8 +942,11 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
   
   # Mostrar tabla de coeficientes
   coefficients_table %>%
-    kable(caption = "Tabla 7.3: Coeficientes del modelo de regresión lineal simple") %>%
-    kable_styling(full_width = FALSE)
+    kable(caption = "Tabla 7.3: Coeficientes del modelo de regresión lineal simple", 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
   
   # Métricas de bondad de ajuste
   model_metrics <- tibble(
@@ -957,8 +963,11 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
   )
   
   model_metrics %>%
-    kable(caption = "Tabla 7.4: Métricas de bondad de ajuste del modelo") %>%
-    kable_styling(full_width = FALSE)
+    kable(caption = "Tabla 7.4: Métricas de bondad de ajuste del modelo", 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
   
   # Ecuación del modelo
   intercept <- round(coefficients(slr_model)[1], 4)
@@ -1085,7 +1094,7 @@ if (exists("slr_model")) {
 
 Se realiza un análisis detallado de los residuos para evaluar la calidad del ajuste y se generan predicciones con sus respectivos intervalos de confianza.
 
-```{r slr-predictions}
+```{r slr-predictions, results='asis'}
 # Análisis de residuos y predicciones
 if (exists("slr_model")) {
   
@@ -1105,8 +1114,11 @@ if (exists("slr_model")) {
   )
   
   residuos_stats %>%
-    kable(caption = "Tabla 7.5: Estadísticas descriptivas de los residuos") %>%
-    kable_styling(full_width = FALSE)
+    kable(caption = "Tabla 7.5: Estadísticas descriptivas de los residuos", 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
   
   # Generar predicciones con intervalos de confianza
   pred_data <- tibble(!!sym(best_predictor) := seq(min(df_mat[[best_predictor]], na.rm = TRUE),
@@ -1158,8 +1170,11 @@ if (exists("slr_model")) {
   )
   
   ejemplo_table %>%
-    kable(caption = paste("Tabla 7.6: Ejemplos de predicción con intervalos del 95%")) %>%
-    kable_styling(full_width = FALSE)
+    kable(caption = paste("Tabla 7.6: Ejemplos de predicción con intervalos del 95%"), 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
   
 } else {
   cat("Modelo no disponible para generar predicciones.")
