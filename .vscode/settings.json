@@ -1,0 +1,45 @@
+{
+    "markdownlint.config": {
+        "MD013": false,
+        "MD033": false,
+        "MD041": false,
+        "line-length": false
+    },
+    "markdownlint.run": "off",
+    "editor.rulers": [],
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 120,
+    "[markdown]": {
+        "markdownlint.run": "off",
+        "editor.rulers": [],
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 120
+    },
+    "[rmd]": {
+        "markdownlint.run": "off",
+        "editor.rulers": [],
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 120,
+        "r.lsp.diagnostics": false,
+        "r.rterm.option": [],
+        "r.linting.enabled": false,
+        "editor.guides.indentation": false
+    },
+    "[r]": {
+        "editor.rulers": [],
+        "r.lsp.diagnostics": false,
+        "r.linting.enabled": false,
+        "editor.guides.indentation": false
+    },
+    "markdownlint.ignore": [
+        "**/*.Rmd",
+        "**/*.rmd"
+    ],
+    "r.lsp.diagnostics": false,
+    "r.linting.enabled": false,
+    "r.alwaysUseActiveTerminal": true,
+    "r.bracketedPaste": true,
+    "r.rpath.windows": "",
+    "r.rterm.windows": "",
+    "r.sessionWatcher": false
+}
