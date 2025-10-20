@@ -23,7 +23,9 @@
         "r.lsp.diagnostics": false,
         "r.rterm.option": [],
         "r.linting.enabled": false,
-        "editor.guides.indentation": false
+        "editor.guides.indentation": false,
+        "editor.folding": false,
+        "editor.stickyScroll.enabled": false
     },
     "[r]": {
         "editor.rulers": [],
@@ -41,10 +43,5 @@
     "r.bracketedPaste": true,
     "r.rpath.windows": "",
     "r.rterm.windows": "",
-    "r.sessionWatcher": false,
-
-    "[rmd]": {
-    "editor.folding": false,
-    "editor.stickyScroll.enabled": false
-  }
+    "r.sessionWatcher": false
 }
