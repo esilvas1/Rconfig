@@ -43,5 +43,5 @@
     "r.bracketedPaste": true,
     "r.rpath.windows": "",
     "r.rterm.windows": "",
-    "r.sessionWatcher": false
+    "r.sessionWatcher": true
 }

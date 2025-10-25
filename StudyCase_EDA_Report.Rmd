@@ -10,6 +10,21 @@ output:
     number_sections: true
 ---
 
+```{r install-packages, include=FALSE}
+required_packages <- c("tidyverse", "knitr", "kableExtra", "broom", "ggplot2", 
+                       "forcats", "scales", "dplyr", "gridExtra", "lmtest")
+
+missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
+
+if(length(missing_packages) > 0) {
+  install.packages(missing_packages, dependencies = TRUE)
+}
+
+# Load all packages
+lapply(required_packages, library, character.only = TRUE)
+```
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.height = 5)
 library(tidyverse)
