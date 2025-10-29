@@ -12,7 +12,7 @@ output:
 
 ```{r install-packages, include=FALSE}
 required_packages <- c("tidyverse", "knitr", "kableExtra", "broom", "ggplot2", 
-                       "forcats", "scales", "dplyr", "gridExtra", "lmtest")
+                       "forcats", "scales", "dplyr", "gridExtra", "lmtest", "forecast")
 
 missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
 
@@ -1041,14 +1041,13 @@ if (exists("slr_model")) {
     geom_smooth(method = "loess", se = FALSE, color = "orange") +
     labs(
       title = "Grafico 4.4.1: Residuos vs Valores Ajustados",
-      subtitle = "Evaluación de linealidad y homocedasticidad",
+      subtitle =  paste("n =", nrow(model_data), "observaciones, Evaluación de linealidad y homocedasticidad"),
       x = "Valores Ajustados",
       y = "Residuos"
     ) +
     theme_minimal()
 }
-```
-
+``` 
 
 #### Análisis del Gráfico de Residuos vs Valores Ajustados
 
@@ -1306,7 +1305,18 @@ if (exists("slr_model")) {
   cat("Modelo no disponible para validación de supuestos.")
 }
 ```
+##### Consideraciones del test Shapiro-Wilk
+```{r}
 
+# En tu código, podrías usar:
+if (shapiro_test$p.value > 0.05) {
+  cat("✓ Supuesto de normalidad CUMPLIDO")
+} else if (shapiro_test$statistic > 0.90) {
+  cat("⚠ Ligera desviación de normalidad - ACEPTABLE para uso práctico")
+} else {
+  cat("✗ Desviación significativa - CONSIDERAR transformaciones")
+}
+```
 
 #### Test de Breusch-Pagan para homocedasticidad (requiere lmtest)
 ```{r slr-validation2}
@@ -1347,7 +1357,7 @@ if (exists("slr_model")) {
 }
 ```
 
-## Análisis de Residuos y Predicciones
+## Análisis de Residuos
 
 Se realiza un análisis detallado de los residuos para evaluar la calidad del ajuste y se generan predicciones con sus respectivos intervalos de confianza.
 
@@ -1438,122 +1448,117 @@ if (exists("slr_model")) {
 }
 ```
 
-## Interpretación Final y Conclusiones del Modelo
+dado las violaciones anteriores a los supuestos, se procede con la implementacion de transformaciones:
 
-Se presenta una síntesis completa de los resultados obtenidos, incluyendo la interpretación práctica de los coeficientes, la evaluación de la calidad del modelo y las recomendaciones para su uso.
+## Analisis de transformaciones
 
-```{r slr-conclusions}
-# Interpretación final y conclusiones
-if (exists("slr_model")) {
+```{r transformations-analysis, results='asis'}
+# PASO 1: TRANSFORMACIONES PARA MEJORAR EL MODELO
+# ================================================
+
+cat(paste(rep("=", 40), collapse = ""), "\n\n")
+
+# 1.1 Explorar diferentes transformaciones de G3
+if (nrow(df_mat) > 0 && exists("best_predictor")) {
+  library(forecast)
+  library(purrr)  # Asegurar que purrr esté cargado para map_dfr
   
-  cat("**CONCLUSIONES DEL MODELO DE REGRESIÓN LINEAL SIMPLE**\n")
-  cat(paste(rep("=", 60), collapse = ""), "\n\n")
+  # Crear dataset con transformaciones
+  df_trans <- df_mat %>%
+    filter(G3 > 0, !is.na(G3), !is.na(.data[[best_predictor]])) %>%
+    mutate(
+      G3_original = G3,
+      G3_log = log(G3),
+      G3_sqrt = sqrt(G3),
+      G3_cuadrada = G3^2
+    )
   
-  # Información del modelo
-  model_summary <- summary(slr_model)
-  intercept <- round(coefficients(slr_model)[1], 4)
-  slope <- round(coefficients(slr_model)[2], 4)
-  r_squared <- round(model_summary$r.squared, 4)
-  adj_r_squared <- round(model_summary$adj.r.squared, 4)
+  # Transformación Box-Cox
+  if (min(df_trans$G3) > 0) {
+    lambda_bc <- BoxCox.lambda(df_trans$G3)
+    df_trans$G3_boxcox <- BoxCox(df_trans$G3, lambda_bc)
+    cat("Lambda óptimo Box-Cox:", round(lambda_bc, 4), "\n\n")
+  }
   
-  cat("**1. MODELO AJUSTADO:**\n")
-  cat("   Ecuación: G3 =", intercept, "+", slope, "×", best_predictor, "\n")
-  cat("   Variable predictora:", best_predictor, "\n")
-  cat("   Variable respuesta: G3 (Nota Final)\n\n")
+  # Lista de transformaciones a probar
+  transformaciones <- c("G3_original", "G3_log", "G3_sqrt", "G3_boxcox")
   
-  cat("**2. CALIDAD DEL AJUSTE:**\n")
-  cat("   R² =", r_squared, "(", round(r_squared * 100, 2), "% de variabilidad explicada)\n")
-  cat("   R² ajustado =", adj_r_squared, "\n")
-  cat("   Error estándar residual =", round(model_summary$sigma, 4), "\n\n")
+  # Crear lista vacía para resultados
+  resultados_lista <- list()
   
-  cat("**3. SIGNIFICANCIA ESTADÍSTICA:**\n")
-  coef_pvalue <- summary(slr_model)$coefficients[2, 4]
-  cat("   Coeficiente de", best_predictor, ":", 
-      ifelse(coef_pvalue < 0.001, "altamente significativo (p < 0.001)", 
-             paste("significativo (p =", round(coef_pvalue, 4), ")")), "\n")
+  # Iterar sobre transformaciones
+  for (i in seq_along(transformaciones)) {
+    trans_var <- transformaciones[i]
+    
+    if (trans_var %in% names(df_trans)) {
+      # Ajustar modelo
+      formula_trans <- as.formula(paste(trans_var, "~", best_predictor))
+      modelo_trans <- lm(formula_trans, data = df_trans)
+      
+      # Tests de supuestos
+      shapiro_p <- if(nrow(df_trans) <= 5000) {
+        tryCatch(shapiro.test(residuals(modelo_trans))$p.value, error = function(e) NA)
+      } else NA
+      
+      bp_p <- if(requireNamespace("lmtest", quietly = TRUE)) {
+        tryCatch(lmtest::bptest(modelo_trans)$p.value, error = function(e) NA)
+      } else NA
+      
+      # Guardar resultados
+      resultados_lista[[i]] <- tibble(
+        Transformacion = trans_var,
+        R_cuadrado = round(summary(modelo_trans)$r.squared, 4),
+        Shapiro_p = if(is.na(shapiro_p)) NA else round(shapiro_p, 4),
+        BP_p = if(is.na(bp_p)) NA else round(bp_p, 4),
+        Error_std = round(summary(modelo_trans)$sigma, 4),
+        AIC = round(AIC(modelo_trans), 2)
+      )
+    }
+  }
   
-  f_pvalue <- pf(model_summary$fstatistic[1], model_summary$fstatistic[2], model_summary$fstatistic[3], lower.tail = FALSE)
-  cat("   Modelo global:", 
-      ifelse(f_pvalue < 0.001, "altamente significativo (p < 0.001)", 
-             paste("significativo (p =", round(f_pvalue, 4), ")")), "\n\n")
+  # Combinar resultados
+  resultados_trans <- bind_rows(resultados_lista) %>%
+    filter(!is.na(Transformacion))
   
-  cat("**4. INTERPRETACIÓN PRÁCTICA:**\n")
-  cat("   - Por cada punto adicional en", best_predictor, ", la nota final (G3)")
-  cat(ifelse(slope > 0, " aumenta ", " disminuye "))
-  cat("en promedio", abs(slope), "puntos\n")
-  
-  cat("   - El modelo predice que un estudiante con", best_predictor, "= 0 tendría")
-  cat(" una nota final de", intercept, "puntos (intercepción)\n")
-  
-  cat("   - La correlación observada (r =", round(sqrt(r_squared), 4), ") indica una relación")
-  if (sqrt(r_squared) >= 0.7) {
-    cat(" fuerte")
-  } else if (sqrt(r_squared) >= 0.5) {
-    cat(" moderada")
+  # Mostrar tabla solo si hay resultados
+  if (nrow(resultados_trans) > 0) {
+    print(kable(resultados_trans, 
+                caption = "Tabla 8.1: Comparación de Transformaciones", 
+                format = "html") %>%
+          kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover")))
+    
+    # Seleccionar mejor transformación
+    mejor_trans <- resultados_trans %>%
+      filter(!is.na(Shapiro_p), !is.na(BP_p)) %>%
+      mutate(
+        normalidad_ok = Shapiro_p > 0.05,
+        homoced_ok = BP_p > 0.05,
+        score = (normalidad_ok * 2) + (homoced_ok * 2) + (R_cuadrado * 1)
+      ) %>%
+      arrange(desc(score))
+    
+    if (nrow(mejor_trans) > 0) {
+      mejor_trans <- mejor_trans %>% slice(1)
+      cat("\n\nMejor transformación identificada:", mejor_trans$Transformacion, "\n\n")
+
+      cat("Score combinado:", round(mejor_trans$score, 2), "\n\n")
+
+      cat("Normalidad (p-valor):", mejor_trans$Shapiro_p, "\n\n")
+
+      cat("Homocedasticidad (p-valor):", mejor_trans$BP_p, "\n\n")
+    } else {
+      cat("\n\nNo se pudo determinar la mejor transformación debido a datos faltantes.\n")
+    }
   } else {
-    cat(" débil a moderada")
+    cat("No se pudieron calcular las transformaciones.\n")
   }
-  cat(" entre las variables\n\n")
-  
-  cat("**5. VALIDACIÓN DE SUPUESTOS:**\n")
-  
-  # Verificar supuestos
-  supuestos_ok <- TRUE
-  
-  # Shapiro-Wilk si aplica
-  if (length(residuals(slr_model)) <= 5000) {
-    shapiro_p <- shapiro.test(residuals(slr_model))$p.value
-    cat("   - Normalidad de residuos:", 
-        ifelse(shapiro_p > 0.05, "CUMPLE", "NO CUMPLE"), 
-        "(Shapiro-Wilk p =", round(shapiro_p, 4), ")\n")
-    if (shapiro_p <= 0.05) supuestos_ok <- FALSE
-  }
-  
-  # Breusch-Pagan si está disponible
-  if (requireNamespace("lmtest", quietly = TRUE)) {
-    bp_p <- lmtest::bptest(slr_model)$p.value
-    cat("   - Homocedasticidad:", 
-        ifelse(bp_p > 0.05, "CUMPLE", "NO CUMPLE"), 
-        "(Breusch-Pagan p =", round(bp_p, 4), ")\n")
-    if (bp_p <= 0.05) supuestos_ok <- FALSE
-  }
-  
-  # Observaciones influyentes
-  cooksd <- cooks.distance(slr_model)
-  influential_count <- sum(cooksd > 4/length(cooksd))
-  cat("   - Observaciones influyentes:", influential_count, "de", length(cooksd), 
-      ifelse(influential_count <= 0.05 * length(cooksd), "(ACEPTABLE)", "(REVISAR)"), "\n\n")
-  
-  cat("**6. RECOMENDACIONES:**\n")
-  
-  if (r_squared >= 0.5 && supuestos_ok) {
-    cat("   ✓ El modelo es APROPIADO para predicción con las siguientes características:\n")
-    cat("     - Poder predictivo", ifelse(r_squared >= 0.7, "alto", "moderado"), "\n")
-    cat("     - Cumple supuestos estadísticos\n")
-    cat("     - Relación significativa entre variables\n")
-  } else if (r_squared >= 0.3) {
-    cat("   ⚠ El modelo es ÚTIL pero con limitaciones:\n")
-    if (r_squared < 0.5) cat("     - Poder predictivo limitado (R² < 0.5)\n")
-    if (!supuestos_ok) cat("     - Algunos supuestos no se cumplen completamente\n")
-    cat("     - Considerar variables adicionales o transformaciones\n")
-  } else {
-    cat("   ✗ El modelo tiene LIMITACIONES importantes:\n")
-    cat("     - Bajo poder predictivo (R² < 0.3)\n")
-    cat("     - Buscar variables predictoras más relevantes\n")
-    cat("     - Considerar modelos más complejos\n")
-  }
-  
-  cat("\n**7. USO PRÁCTICO:**\n")
-  cat("   Para predecir G3 de un nuevo estudiante, use la ecuación:\n")
-  cat("   G3_predicho =", intercept, "+", slope, "× valor_de_", best_predictor, "\n")
-  cat("   (Considere los intervalos de predicción para incertidumbre)\n")
   
 } else {
-  cat("Modelo no disponible para generar conclusiones.")
+  cat("Datos no disponibles para análisis de transformaciones.\n")
 }
 ```
 
----
+
 
 ```r
 rmarkdown::render("StudyCase_EDA_Report.Rmd")
