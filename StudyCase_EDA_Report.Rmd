@@ -1558,6 +1558,50 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
 }
 ```
 
+## Analisis de observaciones influyentes
+
+```{r influential-treatment-simple, results='asis'}
+if (exists("slr_model")) {
+
+  model_data <- augment(slr_model)
+  cooksd_threshold <- 4/nrow(model_data)
+  
+  # Identificar observaciones influyentes
+  influential_indices <- which(model_data$.cooksd > cooksd_threshold)
+  
+  if (length(influential_indices) > 0) {
+    cat("Observaciones influyentes encontradas:", length(influential_indices), "\n\n")
+    
+    # Crear tabla simple
+    tabla_influyentes <- model_data[influential_indices, ] %>%
+      select(all_of(c(best_predictor, "G3")), .cooksd) %>%
+      mutate(
+        ID = influential_indices,
+        .cooksd = round(.cooksd, 4)
+      ) %>%
+      select(ID, everything()) %>%
+      head(10)
+    
+    print(kable(tabla_influyentes,
+                caption = "Tabla 8.2: Observaciones Influyentes",
+                format = "html") %>%
+          kable_styling(full_width = FALSE))
+  } else {
+    cat("No se encontraron observaciones influyentes.\n")
+  }
+} else {
+  cat("Modelo no disponible.\n")
+}
+```
+
+
+Causas Posibles de G3 = 0:
+
+**Ausentismo:** Estudiantes que no presentaron el examen final.<br/>
+**Abandono académico:** Deserción durante el curso.<br/>
+**Problemas personales:** Circunstancias que impidieron completar el curso.<br/>
+**Errores de registro:** Posibles errores en la captura de datos.<br/>
+
 
 
 ```r
