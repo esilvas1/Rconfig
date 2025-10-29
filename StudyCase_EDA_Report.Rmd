@@ -1546,6 +1546,65 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
       cat("Normalidad (p-valor):", mejor_trans$Shapiro_p, "\n\n")
 
       cat("Homocedasticidad (p-valor):", mejor_trans$BP_p, "\n\n")
+      
+      # GRÁFICOS COMPARATIVOS DE TRANSFORMACIONES
+      library(gridExtra)
+      
+      # Modelo original para comparación
+      modelo_original <- lm(as.formula(paste("G3_original ~", best_predictor)), data = df_trans)
+      data_orig <- augment(modelo_original)
+      
+      p1 <- ggplot(data_orig, aes(x = .fitted, y = .resid)) +
+        geom_point(alpha = 0.6, color = "#2b8cbe") +
+        geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+        geom_smooth(method = "loess", se = FALSE, color = "orange") +
+        labs(title = "G3 Original", 
+             subtitle = paste("Shapiro p =", round(resultados_trans$Shapiro_p[1], 4)),
+             x = "Valores Ajustados", y = "Residuos") +
+        theme_minimal()
+      
+      # Mejor transformación identificada
+      if (mejor_trans$Transformacion != "G3_original") {
+        modelo_mejor <- lm(as.formula(paste(mejor_trans$Transformacion, "~", best_predictor)), data = df_trans)
+        data_mejor <- augment(modelo_mejor)
+        
+        p2 <- ggplot(data_mejor, aes(x = .fitted, y = .resid)) +
+          geom_point(alpha = 0.6, color = "#d62728") +
+          geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+          geom_smooth(method = "loess", se = FALSE, color = "orange") +
+          labs(title = paste("Mejor:", mejor_trans$Transformacion), 
+               subtitle = paste("Shapiro p =", round(mejor_trans$Shapiro_p, 4)),
+               x = "Valores Ajustados", y = "Residuos") +
+          theme_minimal()
+        
+        # Q-Q plots comparativos
+        p3 <- ggplot(data_orig, aes(sample = .resid)) +
+          stat_qq(alpha = 0.6, color = "#2b8cbe") +
+          stat_qq_line(color = "red") +
+          labs(title = "Q-Q Plot: Original", x = "Teóricos", y = "Residuos") +
+          theme_minimal()
+        
+        p4 <- ggplot(data_mejor, aes(sample = .resid)) +
+          stat_qq(alpha = 0.6, color = "#d62728") +
+          stat_qq_line(color = "red") +
+          labs(title = paste("Q-Q Plot:", mejor_trans$Transformacion), x = "Teóricos", y = "Residuos") +
+          theme_minimal()
+        
+        # Mostrar gráficos
+        grid.arrange(p1, p2, p3, p4, ncol = 2, 
+                     top = "Gráfico 8.1: Comparación de Transformaciones - Diagnósticos de Residuos")
+      } else {
+        # Solo Q-Q plot si la original es la mejor
+        p2 <- ggplot(data_orig, aes(sample = .resid)) +
+          stat_qq(alpha = 0.6, color = "#2b8cbe") +
+          stat_qq_line(color = "red") +
+          labs(title = "Q-Q Plot: G3 Original", x = "Teóricos", y = "Residuos") +
+          theme_minimal()
+        
+        grid.arrange(p1, p2, ncol = 2, 
+                     top = "Gráfico 8.1: Diagnósticos del Modelo Original")
+      }
+      
     } else {
       cat("\n\nNo se pudo determinar la mejor transformación debido a datos faltantes.\n")
     }
@@ -1586,6 +1645,33 @@ if (exists("slr_model")) {
                 caption = "Tabla 8.2: Observaciones Influyentes",
                 format = "html") %>%
           kable_styling(full_width = FALSE))
+    
+    # GRÁFICO DE OBSERVACIONES INFLUYENTES
+    cat("\n")
+    
+    # Crear gráfico mostrando observaciones influyentes
+    p_influence <- ggplot(model_data, aes(x = .data[[best_predictor]], y = G3)) +
+      geom_point(alpha = 0.6, color = "lightblue", size = 1.5) +
+      geom_point(data = model_data[influential_indices, ], 
+                 aes(x = .data[[best_predictor]], y = G3), 
+                 color = "red", size = 2.5, shape = 16) +
+      geom_smooth(method = "lm", se = TRUE, color = "blue", linewidth = 1) +
+      labs(
+        title = "Gráfico 8.2: Identificación de Observaciones Influyentes",
+        subtitle = paste("Puntos rojos: observaciones con Cook's D >", round(cooksd_threshold, 6)),
+        x = best_predictor,
+        y = "G3 (Nota Final)",
+        caption = paste("Total de observaciones influyentes:", length(influential_indices))
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(size = 12, face = "bold"),
+        plot.subtitle = element_text(size = 10),
+        plot.caption = element_text(size = 9, color = "gray60")
+      )
+    
+    print(p_influence)
+    
   } else {
     cat("No se encontraron observaciones influyentes.\n")
   }
@@ -1663,6 +1749,72 @@ if (exists("slr_model") && nrow(df_mat) > 0) {
   cat("R²:", round(summary(modelo_winsor)$r.squared, 4), "\n")
   cat("Shapiro p-valor:", round(shapiro_winsor, 4), "\n")
   cat("BP p-valor:", round(bp_winsor, 4), "\n\n")
+  
+  # GRÁFICOS COMPARATIVOS DE MODELOS ALTERNATIVOS
+  library(gridExtra)
+  
+  # Crear lista de gráficos para comparación
+  plots_list <- list()
+  
+  # Gráfico 1: Modelo Original
+  data_orig <- augment(slr_model)
+  plots_list[[1]] <- ggplot(data_orig, aes(x = .fitted, y = .resid)) +
+    geom_point(alpha = 0.6, color = "#1f77b4") +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_smooth(method = "loess", se = FALSE, color = "orange") +
+    labs(title = "Modelo Original",
+         subtitle = paste("R² =", round(summary(slr_model)$r.squared, 3)),
+         x = "Valores Ajustados", y = "Residuos") +
+    theme_minimal()
+  
+  # Gráfico 2: Modelo sin influyentes (si existe)
+  if (exists("modelo_limpio")) {
+    data_limpio <- augment(modelo_limpio)
+    plots_list[[2]] <- ggplot(data_limpio, aes(x = .fitted, y = .resid)) +
+      geom_point(alpha = 0.6, color = "#ff7f0e") +
+      geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+      geom_smooth(method = "loess", se = FALSE, color = "orange") +
+      labs(title = "Sin Influyentes",
+           subtitle = paste("R² =", round(summary(modelo_limpio)$r.squared, 3), 
+                           "| n =", nrow(df_clean)),
+           x = "Valores Ajustados", y = "Residuos") +
+      theme_minimal()
+  }
+  
+  # Gráfico 3: Modelo Winsorizado
+  if (exists("modelo_winsor")) {
+    data_winsor <- augment(modelo_winsor)
+    plots_list[[3]] <- ggplot(data_winsor, aes(x = .fitted, y = .resid)) +
+      geom_point(alpha = 0.6, color = "#2ca02c") +
+      geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+      geom_smooth(method = "loess", se = FALSE, color = "orange") +
+      labs(title = "Winsorizado (5%-95%)",
+           subtitle = paste("R² =", round(summary(modelo_winsor)$r.squared, 3)),
+           x = "Valores Ajustados", y = "Residuos") +
+      theme_minimal()
+  }
+  
+  # Gráfico 4: Modelo Robusto (residuos vs ajustados)
+  if (exists("modelo_robusto")) {
+    residuos_rob <- residuals(modelo_robusto)
+    ajustados_rob <- fitted(modelo_robusto)
+    data_robusto <- data.frame(fitted = ajustados_rob, resid = residuos_rob)
+    
+    plots_list[[4]] <- ggplot(data_robusto, aes(x = fitted, y = resid)) +
+      geom_point(alpha = 0.6, color = "#d62728") +
+      geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+      geom_smooth(method = "loess", se = FALSE, color = "orange") +
+      labs(title = "Modelo Robusto",
+           subtitle = paste("R² aprox =", round(r2_robusto, 3)),
+           x = "Valores Ajustados", y = "Residuos") +
+      theme_minimal()
+  }
+  
+  # Mostrar gráficos en grid
+  if (length(plots_list) >= 2) {
+    grid.arrange(grobs = plots_list, ncol = 2, 
+                 top = "Gráfico 8.3: Comparación de Residuos - Modelos Alternativos")
+  }
 }
 ```
 
@@ -1785,6 +1937,39 @@ if (exists("slr_model")) {
     modelo_final <- if(exists("modelo_robusto")) modelo_robusto else slr_model
     datos_finales <- df_mat
   }
+  
+  # GRÁFICO DE SELECCIÓN DEL MODELO
+  if (nrow(modelos_resultados) > 1) {
+    cat("\n")
+    
+    # Gráfico de comparación de R² vs cumplimiento de supuestos
+    p_comparison <- modelos_resultados %>%
+      mutate(
+        Color = ifelse(Supuestos_OK, "Cumple Supuestos", "No Cumple"),
+        Seleccionado = ifelse(row_number() == which.max(ifelse(Supuestos_OK, R_cuadrado, 0)), 
+                             "Modelo Seleccionado", "Otros")
+      ) %>%
+      ggplot(aes(x = R_cuadrado, y = reorder(Modelo, R_cuadrado))) +
+      geom_col(aes(fill = Color), alpha = 0.7) +
+      geom_text(aes(label = paste("R² =", round(R_cuadrado, 3))), 
+                hjust = -0.1, size = 3) +
+      scale_fill_manual(values = c("Cumple Supuestos" = "#2ca02c", 
+                                   "No Cumple" = "#d62728")) +
+      labs(
+        title = "Gráfico 8.4: Comparación de Modelos - R² y Cumplimiento de Supuestos",
+        subtitle = "Verde: Cumple supuestos | Rojo: No cumple supuestos",
+        x = "R² (Capacidad Explicativa)",
+        y = "Tipo de Modelo",
+        fill = "Estado"
+      ) +
+      theme_minimal() +
+      theme(
+        legend.position = "bottom",
+        plot.title = element_text(size = 12, face = "bold")
+      )
+    
+    print(p_comparison)
+  }
 }
 ```
 
@@ -1842,9 +2027,31 @@ if (exists("modelo_final")) {
       labs(title = "Q-Q Plot", x = "Teóricos", y = "Residuos") +
       theme_minimal()
     
-    # Mostrar gráficos lado a lado
-    grid.arrange(p1, p2, ncol = 2, 
-                 top = "Gráfico 8.1: Diagnósticos del Modelo Final")
+    # Histograma de residuos
+    p3 <- ggplot(model_data_final, aes(x = .resid)) +
+      geom_histogram(aes(y = after_stat(density)), bins = 20, 
+                     fill = "#2b8cbe", alpha = 0.7, color = "white") +
+      geom_density(color = "red", linewidth = 1) +
+      stat_function(fun = dnorm, 
+                    args = list(mean = mean(model_data_final$.resid), 
+                               sd = sd(model_data_final$.resid)),
+                    color = "orange", linetype = "dashed", linewidth = 1) +
+      labs(title = "Distribución de Residuos", x = "Residuos", y = "Densidad") +
+      theme_minimal()
+    
+    # Distancia de Cook
+    p4 <- ggplot(model_data_final, aes(x = seq_along(.cooksd), y = .cooksd)) +
+      geom_point(alpha = 0.6, color = "#2b8cbe") +
+      geom_hline(yintercept = 4/nrow(model_data_final), 
+                 color = "red", linetype = "dashed") +
+      labs(title = "Distancia de Cook", 
+           subtitle = "Línea roja: umbral 4/n",
+           x = "Índice de Observación", y = "Distancia de Cook") +
+      theme_minimal()
+    
+    # Mostrar gráficos en grid 2x2
+    grid.arrange(p1, p2, p3, p4, ncol = 2, 
+                 top = "Gráfico 8.5: Diagnósticos Completos del Modelo Final")
     
     # Tests finales
     if (nrow(datos_finales) <= 5000) {
@@ -1929,7 +2136,67 @@ if (exists("modelo_final")) {
   cat("1. Usar el modelo para predicciones dentro del rango de datos observado\n")
   cat("2. Considerar intervalos de predicción para capturar incertidumbre\n")
   cat("3. Validar periódicamente con nuevos datos\n")
-  cat("4. Para mejores predicciones, considerar modelos multivariados en futuros estudios\n")
+  cat("4. Para mejores predicciones, considerar modelos multivariados en futuros estudios\n\n")
+  
+  # GRÁFICO FINAL: COMPARACIÓN ANTES vs DESPUÉS
+  if (exists("slr_model")) {
+    cat("**VISUALIZACIÓN FINAL:**\n")
+    
+    # Crear gráfico de comparación
+    # Modelo original
+    data_original <- augment(slr_model)
+    
+    # Datos para el gráfico
+    if (tipo_modelo == "Robusto") {
+      # Para modelo robusto
+      fitted_final <- fitted(modelo_final)
+      p_final <- ggplot(datos_finales, aes(x = .data[[best_predictor]], y = G3)) +
+        geom_point(alpha = 0.6, color = "lightblue", size = 1) +
+        geom_smooth(method = "lm", se = TRUE, color = "blue", 
+                   aes(linetype = "Original"), linewidth = 1) +
+        geom_line(aes(y = fitted_final, linetype = "Final (Robusto)"), 
+                 color = "red", linewidth = 1.2) +
+        scale_linetype_manual(values = c("Original" = "dashed", "Final (Robusto)" = "solid")) +
+        labs(
+          title = "Gráfico 8.6: Comparación Modelo Original vs Final",
+          subtitle = paste("Mejora en robustez - R² final =", round(r2_final, 3)),
+          x = best_predictor,
+          y = "G3 (Nota Final)",
+          linetype = "Modelo"
+        ) +
+        theme_minimal() +
+        theme(legend.position = "bottom")
+    } else {
+      # Para modelo lineal clásico
+      data_final <- augment(modelo_final)
+      p_final <- ggplot(datos_finales, aes(x = .data[[best_predictor]], y = G3)) +
+        geom_point(alpha = 0.6, color = "lightblue", size = 1) +
+        geom_smooth(data = df_mat, method = "lm", se = FALSE, 
+                   aes(linetype = "Original"), color = "blue", linewidth = 1) +
+        geom_smooth(method = "lm", se = TRUE, 
+                   aes(linetype = "Final"), color = "red", linewidth = 1.2) +
+        scale_linetype_manual(values = c("Original" = "dashed", "Final" = "solid")) +
+        labs(
+          title = "Gráfico 8.6: Comparación Modelo Original vs Final",
+          subtitle = paste("Mejora en cumplimiento de supuestos - R² final =", round(r2_final, 3)),
+          x = best_predictor,
+          y = "G3 (Nota Final)",
+          linetype = "Modelo"
+        ) +
+        theme_minimal() +
+        theme(legend.position = "bottom")
+    }
+    
+    print(p_final)
+    
+    # Resumen cuantitativo de la mejora
+    cat("\n**RESUMEN DE MEJORAS LOGRADAS:**\n")
+    r2_original <- summary(slr_model)$r.squared
+    cat("• R² Original:", round(r2_original, 4), "\n")
+    cat("• R² Final:", round(r2_final, 4), "\n")
+    cat("• Cambio en R²:", round(r2_final - r2_original, 4), "\n")
+    cat("• Tipo de mejora:", tipo_modelo, "\n")
+  }
 }
 ```
 ```r
