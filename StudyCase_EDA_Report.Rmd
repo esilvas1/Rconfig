@@ -2010,20 +2010,16 @@ if (exists("slr_model")) {
                 col.names = c("Modelo", "R²", "Shapiro p", "BP p", "Normalidad", "Homoced.", "Cumple", "Justificación")) %>%
           kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover")))
     
-    # LÓGICA DE SELECCIÓN EXPLÍCITA
-    cat("\n**PROCESO DE SELECCIÓN DEL MODELO:**\n")
-    cat("1. **Criterio Principal:** Cumplimiento de supuestos estadísticos\n")
-    cat("2. **Criterio Secundario:** Mayor R² entre modelos válidos\n\n")
     
     # Evaluar qué modelos cumplen supuestos
     modelos_validos <- modelos_resultados %>% dplyr::filter(Supuestos_OK == TRUE)
     
     if (nrow(modelos_validos) > 0) {
-      cat("**MODELOS QUE CUMPLEN SUPUESTOS:**\n")
+      cat("**MODELOS QUE CUMPLEN SUPUESTOS:**\n\n")
       for (i in 1:nrow(modelos_validos)) {
         modelo <- modelos_validos[i, ]
         cat("• ", modelo$Modelo, ": R² =", round(modelo$R_cuadrado, 4), 
-            "| Justificación:", modelo$Justificacion, "\n")
+            "| Justificación:", modelo$Justificacion, "\n\n")
       }
       
       # Seleccionar el mejor entre los válidos
@@ -2031,20 +2027,8 @@ if (exists("slr_model")) {
         dplyr::arrange(desc(R_cuadrado)) %>%
         dplyr::slice(1)
       
-      cat("\n🎯 **MODELO SELECCIONADO:**", mejor_modelo_row$Modelo, "\n")
-      cat("**RAZONES DE LA SELECCIÓN:**\n")
-      cat("✓ Cumple todos los supuestos requeridos:", mejor_modelo_row$Justificacion, "\n")
-      cat("✓ Mayor capacidad explicativa: R² =", round(mejor_modelo_row$R_cuadrado, 4), "\n")
-      cat("✓ Muestra completa: N =", mejor_modelo_row$N_obs, "observaciones\n\n")
       
     } else {
-      cat("**⚠️ NINGÚN MODELO CUMPLE SUPUESTOS CLÁSICOS PERFECTAMENTE**\n")
-      cat("**SELECCIÓN POR DEFECTO:** Modelo Robusto\n")
-      cat("**JUSTIFICACIÓN:**\n")
-      cat("• Los modelos robustos no requieren supuestos estrictos de normalidad\n")
-      cat("• Son resistentes a observaciones atípicas y heterocedasticidad\n")
-      cat("• Proporcionan estimaciones confiables bajo violaciones de supuestos\n")
-      cat("• Mantienen validez estadística en presencia de anomalías\n\n")
       
       # Buscar modelo robusto si existe
       modelo_robusto_row <- modelos_resultados %>% dplyr::filter(Modelo == "Robusto")
@@ -2069,66 +2053,32 @@ if (exists("slr_model")) {
       } else if (mejor_modelo_row$Modelo == "Robusto" && exists("modelo_robusto")) {
         modelo_final <- modelo_robusto
         datos_finales <- df_mat
-        cat("**MODELO IMPLEMENTADO:** Regresión Robusta (M-estimadores)\n")
+        cat("**MODELO IMPLEMENTADO:** Regresión Robusta (M-estimadores)\n\n")
       } else {
         modelo_final <- slr_model
         datos_finales <- df_mat
         cat("**MODELO IMPLEMENTADO:** Regresión Lineal Original (con limitaciones documentadas)\n")
       }
       
-      cat("**VALIDEZ ESTADÍSTICA:** ✓ Confirmada\n")
+      cat("**VALIDEZ ESTADÍSTICA:** ✓ Confirmada\n\n")
       cat("**APLICABILIDAD:** ✓ Apropiada para el contexto educativo\n\n")
     }
     
-    # GRÁFICO DE SELECCIÓN MEJORADO
-    if (nrow(modelos_resultados) > 1) {
-      tryCatch({
-        p_comparison <- modelos_resultados %>%
-          dplyr::mutate(
-            Status = dplyr::case_when(
-              Modelo == mejor_modelo_row$Modelo ~ "Seleccionado",
-              Supuestos_OK ~ "Válido",
-              TRUE ~ "No Válido"
-            )
-          ) %>%
-          ggplot(aes(x = R_cuadrado, y = reorder(Modelo, R_cuadrado))) +
-          geom_col(aes(fill = Status), alpha = 0.8) +
-          geom_text(aes(label = paste("R² =", round(R_cuadrado, 3))), 
-                    hjust = -0.1, size = 3.5, fontface = "bold") +
-          scale_fill_manual(values = c("Seleccionado" = "#FF6B35", "Válido" = "#2ca02c", "No Válido" = "#d62728")) +
-          labs(
-            title = "Gráfico 8.4: Proceso de Selección del Modelo Final",
-            subtitle = "Naranja: Modelo Seleccionado | Verde: Cumple Supuestos | Rojo: No Cumple",
-            x = "R² (Capacidad Explicativa)",
-            y = "Tipo de Modelo",
-            fill = "Estado de Validación"
-          ) +
-          theme_minimal() +
-          theme(
-            legend.position = "bottom",
-            plot.title = element_text(size = 12, face = "bold"),
-            plot.subtitle = element_text(size = 10)
-          )
-        
-        print(p_comparison)
-      }, error = function(e) {
-        cat("Error al generar gráfico de comparación:", e$message, "\n")
-      })
-    }
   } else {
     cat("No se pudieron evaluar los modelos correctamente.\n")
   }
 }
 ```
 
+
+
+## Validación final del modelos seleccionado
 ```{r final-validation, results='asis'}
 # PASO 5: VALIDACIÓN FINAL DEL MODELO SELECCIONADO
 # ================================================
 
 if (exists("modelo_final")) {
   
-  cat("VALIDACIÓN FINAL DEL MODELO SELECCIONADO\n")
-  cat(paste(rep("=", 45), collapse = ""), "\n\n")
   
   # Si es modelo robusto, hacer validación especial
   if (class(modelo_final)[1] == "rlm") {
@@ -2221,7 +2171,7 @@ if (exists("modelo_final")) {
   }
   
   # Resumen final del modelo
-  cat("\nRESUMEN DEL MODELO FINAL:\n")
+  cat("\n\n\nRESUMEN DEL MODELO FINAL:\n")
   if (class(modelo_final)[1] == "rlm") {
     cat("Coeficientes:\n")
     print(round(coef(modelo_final), 4))
@@ -2240,15 +2190,15 @@ if (exists("modelo_final")) {
 }
 ```
 
+## Conclusiones finales del análisis
+
 ```{r final-conclusions, results='asis'}
 # PASO 6: CONCLUSIONES FINALES Y RECOMENDACIONES
 # ==============================================
 
 if (exists("modelo_final") && exists("best_predictor")) {
   
-  cat("CONCLUSIONES FINALES DEL ANÁLISIS\n")
-  cat(paste(rep("=", 40), collapse = ""), "\n\n")
-  
+
   # Determinar el tipo de modelo final
   tipo_modelo <- if(class(modelo_final)[1] == "rlm") "Robusto" else "Lineal Clásico"
   
@@ -2327,12 +2277,12 @@ if (exists("modelo_final") && exists("best_predictor")) {
       print(p_final)
       
       # Resumen cuantitativo de la mejora
-      cat("\n**RESUMEN DE MEJORAS LOGRADAS:**\n")
+      cat("\n\n\n**RESUMEN DE MEJORAS LOGRADAS:**\n\n")
       r2_original <- summary(slr_model)$r.squared
-      cat("• R² Original:", round(r2_original, 4), "\n")
-      cat("• R² Final:", round(r2_final, 4), "\n")
-      cat("• Cambio en R²:", round(r2_final - r2_original, 4), "\n")
-      cat("• Tipo de mejora:", tipo_modelo, "\n")
+      cat("• R² Original:", round(r2_original, 4), "\n\n")
+      cat("• R² Final:", round(r2_final, 4), "\n\n")
+      cat("• Cambio en R²:", round(r2_final - r2_original, 4), "\n\n")
+      cat("• Tipo de mejora:", tipo_modelo, "\n\n")
       
     }, error = function(e) {
       cat("Error al generar gráfico final:", e$message, "\n")
