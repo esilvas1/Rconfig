@@ -2630,3 +2630,544 @@ El modelo es válido y apropiado para uso práctico, con las siguientes consider
 En conjunto, este análisis confirma la solidez del modelo ajustado y su capacidad para hacer predicciones confiables de las calificaciones finales (G3) basadas en las calificaciones del segundo período (G2) para el dataset de portugués.
 
 
+### Histograma de Residuos
+
+```{r slr-assumptions3-por}
+if (exists("slr_model")) {
+  library(ggplot2) 
+  # 3. Histograma de residuos
+  ggplot(model_data, aes(x = .resid)) +
+    geom_histogram(aes(y = after_stat(density)), bins = 20, 
+                   fill = "#2b8cbe", alpha = 0.7, color = "white") +
+    geom_density(color = "red", linewidth = 1) +
+    stat_function(fun = dnorm, 
+                  args = list(mean = mean(model_data$.resid), 
+                             sd = sd(model_data$.resid)),
+                  color = "orange", linetype = "dashed", linewidth = 1) +
+    labs(title = "Grafica 4.4.3.1: Distribución de Residuos",
+         subtitle = "Comparación con distribución normal",
+         x = "Residuos",
+         y = "Densidad"
+    ) +
+    theme_minimal()
+ }
+```
+
+
+#### Análisis del Histograma de Residuos
+
+- **Distribución aproximadamente simétrica**: El histograma muestra una forma general simétrica centrada alrededor de cero, lo cual es consistente con el supuesto de que los residuos deben tener media cero.
+
+- **Forma bimodal distintiva**: Se observan dos picos claramente definidos en la distribución, indicando una estructura más compleja que sugiere posibles subgrupos en los datos o patrones discretos en las calificaciones.
+
+- **Concentración central muy alta**: La mayor densidad de residuos se encuentra concentrada en el rango [-1, +1], con picos que alcanzan densidades superiores a 0.75, indicando una concentración extrema cerca de cero.
+
+#### Desviaciones Observadas:
+
+- **Diferencia marcada entre curvas**: La **línea roja sólida** (densidad kernel estimada de los residuos) muestra múltiples picos que contrastan dramáticamente con la **línea naranja punteada** (distribución normal teórica), especialmente en la región central.
+
+- **Picos extremadamente pronunciados**: La distribución empírica (roja) muestra picos mucho más altos y estrechos que la distribución normal teórica, sugiriendo una **concentración extrema de valores específicos** característica de datos discretos.
+
+- **Colas prácticamente ausentes**: La distribución empírica muestra densidad casi nula en los extremos, contrastando significativamente con las colas de la distribución normal teórica.
+
+- **Patrón escalonado marcado**: La estructura claramente escalonada refleja la naturaleza discreta de las calificaciones (valores enteros), donde múltiples estudiantes obtienen calificaciones idénticas.
+
+#### Comparación de distribuciones:
+- **Histograma (barras azules)**: Muestra la distribución empírica real de los residuos con estructura claramente discreta
+- **Curva roja sólida**: Estimación suavizada (kernel) que revela los múltiples picos característicos de datos categóricos
+- **Curva naranja punteada**: Distribución normal teórica que no se ajusta a la realidad de los datos discretos
+
+#### Implicaciones para el modelo:
+- **Los residuos NO siguen una distribución normal clásica** debido a la naturaleza discreta de las calificaciones
+- **Existe leptocurtosis extrema** (concentración central muy alta), típica de variables discretas en contextos educativos
+- **La estructura bimodal es característica** de datos de calificaciones donde ciertos valores son más comunes
+
+#### Fortalezas del modelo:
+- La distribución centrada en cero confirma que el modelo no tiene sesgo sistemático
+- Los picos simétricos sugieren que el modelo captura apropiadamente los patrones centrales
+- La concentración extrema indica predicciones muy precisas para la mayoría de casos
+
+#### Limitaciones identificadas:
+- La naturaleza discreta de los datos viola el supuesto de normalidad continua
+- Los intervalos de confianza basados en normalidad pueden ser inapropiados
+- La estructura bimodal sugiere que un enfoque robusto sería más apropiado
+
+#### Conclusión de histograma de residuos:
+
+El histograma de residuos **revela la naturaleza discreta** de los datos educativos del dataset student_por. Aunque la estructura no sigue una distribución normal clásica, **es completamente esperada y apropiada** para este tipo de datos de calificaciones, validando la necesidad de métodos robustos para el análisis.
+
+
+### Gráfico de distancia de Cook
+```{r slr-assumptions4-por}
+if (exists("slr_model")) {
+  library(ggplot2) 
+  # 4. Gráfico de distancia de Cook
+  ggplot(model_data, aes(x = seq_along(.cooksd), y = .cooksd)) +
+    geom_point(alpha = 0.6, color = "#2b8cbe") +
+    geom_hline(yintercept = 4/nrow(model_data), 
+               color = "red", linetype = "dashed") +
+    labs(
+      title = "Grafica 4.4.4.1: Distancia de Cook",
+      subtitle = "Identificación de observaciones influyentes",
+      x = "Índice de Observación",
+      y = "Distancia de Cook"
+    ) +
+    theme_minimal()
+ }
+```
+
+#### Gráfico de distancia de Cook
+
+- **Mayoría de observaciones dentro del rango normal**: La gran mayoría de los puntos se concentran cerca de cero (por debajo de 0.01), indicando que la mayoría de las observaciones tienen poca influencia individual en los coeficientes del modelo.
+
+- **Distribución esperada**: El patrón general muestra la típica distribución de distancias de Cook, con muchas observaciones de baja influencia y pocas observaciones con valores más altos.
+
+- **Línea de referencia clara**: La línea roja punteada horizontal (umbral = 4/n ≈ 0.006) proporciona un criterio objetivo para identificar observaciones potencialmente influyentes.
+
+#### Observaciones que Requieren Atención:
+
+- **Presencia de observaciones por encima del umbral**: Se observan varios puntos que superan la línea de referencia roja (4/n), con valores de distancia de Cook entre 0.01 y aproximadamente 0.09, indicando **observaciones moderadamente influyentes**.
+
+- **Concentración de observaciones influyentes**: Las observaciones con mayor distancia de Cook se distribuyen principalmente en la segunda mitad del dataset (índices desde ~150 hasta ~649), sugiriendo cierta concentración en una región específica de los datos.
+
+- **Valores máximos moderados**: Aunque hay observaciones influyentes, ninguna presenta valores extremadamente altos (>0.1), lo que sería una señal de alarma mayor, manteniéndose por debajo de 0.09.
+
+#### Criterio de evaluación:
+- **Umbral conservador**: 4/n ≈ 0.006 (línea roja punteada)
+- **Umbral moderado**: 1 (no se alcanza en este gráfico)
+- **Observaciones influyentes identificadas**: Aproximadamente 10-15 observaciones superan el umbral conservador
+
+##### Implicaciones para el modelo:
+- Las observaciones con distancia de Cook elevada **podrían estar afectando ligeramente** los coeficientes estimados
+- **La influencia es moderada**, no extrema, por lo que los coeficientes siguen siendo confiables
+- **Eliminar estas observaciones podría cambiar los coeficientes**, pero probablemente no de manera dramática
+
+#### Impacto en las predicciones:
+- **Las predicciones generales del modelo son robustas** a la presencia de estas observaciones
+- **Los intervalos de confianza y predicción mantienen validez** general
+- **La capacidad predictiva del modelo no se ve comprometida** significativamente
+
+#### Recomendaciones Específicas:
+
+- **Investigación de observaciones influyentes**: Examinar las observaciones con mayor distancia de Cook para identificar:
+   - Patrones comunes (características demográficas, académicas, etc.)
+   - Posibles errores de entrada de datos
+   - Casos genuinamente atípicos pero válidos
+
+- **Análisis de sensibilidad**: Ejecutar el modelo excluyendo las observaciones más influyentes para evaluar:
+   - Cambios en los coeficientes estimados
+   - Variaciones en R² y otras métricas de ajuste
+   - Estabilidad de las conclusiones principales
+
+- **Validación del modelo**: 
+   - **Mantener las observaciones** si representan variabilidad natural del fenómeno
+   - **Documentar la presencia** de estas observaciones en el informe final
+   - **No eliminar automáticamente** sin justificación sustantiva
+
+#### Conclusión de Gráfico de distancia de Cook
+
+El gráfico de distancia de Cook **confirma que el modelo es generalmente robusto** y no está dominado por observaciones atípicas extremas. Aunque se identifican algunas observaciones moderadamente influyentes en el dataset student_por, estas **no comprometen la validez fundamental del modelo**.
+
+### Pruebas estadísticas de supuestos:
+
+#### Test de Shapiro-Wilk para normalidad (si n <= 5000)
+```{r slr-validations1-por}
+
+if (exists("slr_model")) {  
+  # Test de Shapiro-Wilk para normalidad (si n <= 5000)
+  if (length(residuals(slr_model)) <= 5000) {
+    shapiro_test <- shapiro.test(residuals(slr_model))
+    cat("Normalidad de residuos (Shapiro-Wilk):")
+    cat("\n  W =", round(shapiro_test$statistic, 4))
+    cat("\n  p-valor =", ifelse(shapiro_test$p.value < 0.001, "< 0.001", round(shapiro_test$p.value, 4)))
+    cat("\n  Interpretación:", ifelse(shapiro_test$p.value > 0.05, "No rechazar normalidad", "Rechazar normalidad"))
+  }
+  
+} else {
+  cat("Modelo no disponible para validación de supuestos.")
+}
+```
+##### Consideraciones del test Shapiro-Wilk
+```{r}
+
+# En tu código, podrías usar:
+if (shapiro_test$p.value > 0.05) {
+  cat("✓ Supuesto de normalidad CUMPLIDO")
+} else if (shapiro_test$statistic > 0.90) {
+  cat("⚠ Ligera desviación de normalidad - ACEPTABLE para uso práctico")
+} else {
+  cat("✗ Desviación significativa - CONSIDERAR transformaciones")
+}
+```
+
+#### Test de Breusch-Pagan para homocedasticidad (requiere lmtest)
+```{r slr-validation2-por}
+if (exists("slr_model")) {  
+  
+  # Test de Breusch-Pagan para homocedasticidad (requiere lmtest)
+  if (requireNamespace("lmtest", quietly = TRUE)) {
+    library(lmtest)
+    bp_test <- bptest(slr_model)
+    cat("Homocedasticidad (Breusch-Pagan):")
+    cat("\n  BP =", round(bp_test$statistic, 4))
+    cat("\n  p-valor =", ifelse(bp_test$p.value < 0.001, "< 0.001", round(bp_test$p.value, 4)))
+    cat("\n  Interpretación:", ifelse(bp_test$p.value > 0.05, "No rechazar homocedasticidad", "Rechazar homocedasticidad"))
+  }
+} else {
+  cat("Modelo no disponible para validación de supuestos.")
+}
+```
+
+#### Identificar observaciones influyentes
+
+```{r validation3-por}
+if (exists("slr_model")) {
+
+  # Identificar observaciones influyentes
+  influential_obs <- which(model_data$.cooksd > 4/nrow(model_data))
+  
+  if (length(influential_obs) > 0) {
+    cat("Observaciones influyentes (Distancia de Cook > 4/n):")
+    cat("\n  Observaciones:", paste(influential_obs, collapse = ", "))
+    cat("\n  Total:", length(influential_obs), "de", nrow(model_data), "observaciones")
+  } else {
+    cat("\n\nNo se encontraron observaciones influyentes significativas.")
+  }
+  
+} else {
+  cat("Modelo no disponible para validación de supuestos.")
+}
+```
+
+
+## Análisis de Residuos
+
+Se realiza un análisis detallado de los residuos para evaluar la calidad del ajuste y se generan predicciones con sus respectivos intervalos de confianza.
+
+```{r slr-predictions-por, results='asis'}
+# Análisis de residuos y predicciones
+if (exists("slr_model")) {
+  
+  # Estadísticas de residuos
+  residuos <- residuals(slr_model)
+  residuos_stats <- tibble(
+    Estadística = c("Media", "Desviación Estándar", "Mínimo", "Q1", "Mediana", "Q3", "Máximo"),
+    Valor = c(
+      round(mean(residuos), 4),
+      round(sd(residuos), 4),
+      round(min(residuos), 4),
+      round(quantile(residuos, 0.25), 4),
+      round(median(residuos), 4),
+      round(quantile(residuos, 0.75), 4),
+      round(max(residuos), 4)
+    )
+  )
+  
+  residuos_stats %>%
+    kable(caption = "Tabla 7.5: Estadísticas descriptivas de los residuos", 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
+  
+  # Generar predicciones con intervalos de confianza
+  pred_data <- tibble(!!sym(best_predictor) := seq(min(df_mat[[best_predictor]], na.rm = TRUE),
+                                                    max(df_mat[[best_predictor]], na.rm = TRUE),
+                                                    length.out = 50))
+  
+  predictions <- predict(slr_model, newdata = pred_data, interval = "confidence", level = 0.95)
+  pred_results <- bind_cols(pred_data, as_tibble(predictions))
+  
+  # Gráfico de predicciones con intervalos de confianza
+  p_pred <- ggplot() +
+    # Datos originales
+    geom_point(data = df_mat, aes_string(x = best_predictor, y = "G3"), 
+               alpha = 0.6, size = 2, color = "#2b8cbe") +
+    # Línea de regresión
+    geom_line(data = pred_results, aes_string(x = best_predictor, y = "fit"), 
+              color = "red", size = 1) +
+    # Intervalos de confianza
+    geom_ribbon(data = pred_results, aes_string(x = best_predictor, ymin = "lwr", ymax = "upr"), 
+                alpha = 0.2, fill = "red") +
+    labs(
+      title = "Gráfico 7.3: Modelo ajustado con intervalos de confianza",
+      subtitle = paste("IC del 95% para la media de G3 dado", best_predictor),
+      x = paste(best_predictor, "(Variable Predictora)"),
+      y = "G3 (Nota Final)"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 12)
+    )
+  
+  print(p_pred)
+  
+  # Tabla de predicciones ejemplo
+  ejemplo_valores <- c(
+    round(quantile(df_mat[[best_predictor]], c(0.1, 0.25, 0.5, 0.75, 0.9), na.rm = TRUE))
+  )
+  
+  pred_ejemplo <- predict(slr_model, 
+                          newdata = tibble(!!sym(best_predictor) := ejemplo_valores), 
+                          interval = "prediction", level = 0.95)
+  
+  ejemplo_table <- tibble(
+    !!sym(paste(best_predictor, "(Valor)")) := ejemplo_valores,
+    `G3 Predicho` = round(pred_ejemplo[,"fit"], 2),
+    `Límite Inferior (95%)` = round(pred_ejemplo[,"lwr"], 2),
+    `Límite Superior (95%)` = round(pred_ejemplo[,"upr"], 2)
+  )
+  
+  ejemplo_table %>%
+    kable(caption = paste("Tabla 7.6: Ejemplos de predicción con intervalos del 95%"), 
+          format = "html") %>%
+    kable_styling(full_width = FALSE, 
+                  bootstrap_options = c("striped", "hover", "condensed")) %>%
+    cat()
+  
+} else {
+  cat("Modelo no disponible para generar predicciones.")
+}
+```
+
+
+dado las violaciones anteriores a los supuestos, se procede con la implementacion de transformaciones:
+
+
+
+## Analisis de transformaciones
+
+```{r transformations-analysis-por, results='asis'}
+# PASO 1: TRANSFORMACIONES PARA MEJORAR EL MODELO
+
+cat(paste(rep("", 40), collapse = ""), "\n\n")
+
+# 1.1 Explorar diferentes transformaciones de G3
+if (nrow(df_mat) > 0 && exists("best_predictor")) {
+  library(forecast)
+  library(purrr)  # Asegurar que purrr esté cargado para map_dfr
+  
+  # Crear dataset con transformaciones
+  df_trans <- df_mat %>%
+    filter(G3 > 0, !is.na(G3), !is.na(.data[[best_predictor]])) %>%
+    mutate(
+      G3_original = G3,
+      G3_log = log(G3),
+      G3_sqrt = sqrt(G3),
+      G3_cuadrada = G3^2
+    )
+  
+  # Transformación Box-Cox
+  if (min(df_trans$G3) > 0) {
+    lambda_bc <- BoxCox.lambda(df_trans$G3)
+    df_trans$G3_boxcox <- BoxCox(df_trans$G3, lambda_bc)
+    cat("Lambda óptimo Box-Cox:", round(lambda_bc, 4), "\n\n")
+  }
+  
+  # Lista de transformaciones a probar
+  transformaciones <- c("G3_original", "G3_log", "G3_sqrt", "G3_boxcox")
+  
+  # Crear lista vacía para resultados
+  resultados_lista <- list()
+  
+  # Iterar sobre transformaciones
+  for (i in seq_along(transformaciones)) {
+    trans_var <- transformaciones[i]
+    
+    if (trans_var %in% names(df_trans)) {
+      # Ajustar modelo
+      formula_trans <- as.formula(paste(trans_var, "~", best_predictor))
+      modelo_trans <- lm(formula_trans, data = df_trans)
+      
+      # Tests de supuestos
+      shapiro_p <- if(nrow(df_trans) <= 5000) {
+        tryCatch(shapiro.test(residuals(modelo_trans))$p.value, error = function(e) NA)
+      } else NA
+      
+      bp_p <- if(requireNamespace("lmtest", quietly = TRUE)) {
+        tryCatch(lmtest::bptest(modelo_trans)$p.value, error = function(e) NA)
+      } else NA
+      
+      # Guardar resultados
+      resultados_lista[[i]] <- tibble(
+        Transformacion = trans_var,
+        R_cuadrado = round(summary(modelo_trans)$r.squared, 4),
+        Shapiro_p = if(is.na(shapiro_p)) NA else round(shapiro_p, 4),
+        BP_p = if(is.na(bp_p)) NA else round(bp_p, 4),
+        Error_std = round(summary(modelo_trans)$sigma, 4),
+        AIC = round(AIC(modelo_trans), 2)
+      )
+    }
+  }
+  
+  # Combinar resultados
+  resultados_trans <- bind_rows(resultados_lista) %>%
+    filter(!is.na(Transformacion))
+  
+  # Mostrar tabla solo si hay resultados
+  if (nrow(resultados_trans) > 0) {
+    print(kable(resultados_trans, 
+                caption = "Tabla 8.1: Comparación de Transformaciones", 
+                format = "html") %>%
+          kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover")))
+    
+    # Seleccionar mejor transformación
+    mejor_trans <- resultados_trans %>%
+      filter(!is.na(Shapiro_p), !is.na(BP_p)) %>%
+      mutate(
+        normalidad_ok = Shapiro_p > 0.05,
+        homoced_ok = BP_p > 0.05,
+        score = (normalidad_ok * 2) + (homoced_ok * 2) + (R_cuadrado * 1)
+      ) %>%
+      arrange(desc(score))
+    
+    if (nrow(mejor_trans) > 0) {
+      mejor_trans <- mejor_trans %>% slice(1)
+      cat("\n\nMejor transformación identificada:", mejor_trans$Transformacion, "\n\n")
+
+      cat("Score combinado:", round(mejor_trans$score, 2), "\n\n")
+
+      cat("Normalidad (p-valor):", mejor_trans$Shapiro_p, "\n\n")
+
+      cat("Homocedasticidad (p-valor):", mejor_trans$BP_p, "\n\n")
+      
+      # GRÁFICOS COMPARATIVOS DE TRANSFORMACIONES
+      library(gridExtra)
+      
+      # Modelo original para comparación
+      modelo_original <- lm(as.formula(paste("G3_original ~", best_predictor)), data = df_trans)
+      data_orig <- augment(modelo_original)
+      
+      p1 <- ggplot(data_orig, aes(x = .fitted, y = .resid)) +
+        geom_point(alpha = 0.6, color = "#2b8cbe") +
+        geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+        geom_smooth(method = "loess", se = FALSE, color = "orange") +
+        labs(title = "G3 Original", 
+             subtitle = paste("Shapiro p =", round(resultados_trans$Shapiro_p[1], 4)),
+             x = "Valores Ajustados", y = "Residuos") +
+        theme_minimal()
+      
+      # Mejor transformación identificada
+      if (mejor_trans$Transformacion != "G3_original") {
+        modelo_mejor <- lm(as.formula(paste(mejor_trans$Transformacion, "~", best_predictor)), data = df_trans)
+        data_mejor <- augment(modelo_mejor)
+        
+        p2 <- ggplot(data_mejor, aes(x = .fitted, y = .resid)) +
+          geom_point(alpha = 0.6, color = "#d62728") +
+          geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+          geom_smooth(method = "loess", se = FALSE, color = "orange") +
+          labs(title = paste("Mejor:", mejor_trans$Transformacion), 
+               subtitle = paste("Shapiro p =", round(mejor_trans$Shapiro_p, 4)),
+               x = "Valores Ajustados", y = "Residuos") +
+          theme_minimal()
+        
+        # Q-Q plots comparativos
+        p3 <- ggplot(data_orig, aes(sample = .resid)) +
+          stat_qq(alpha = 0.6, color = "#2b8cbe") +
+          stat_qq_line(color = "red") +
+          labs(title = "Q-Q Plot: Original", x = "Teóricos", y = "Residuos") +
+          theme_minimal()
+        
+        p4 <- ggplot(data_mejor, aes(sample = .resid)) +
+          stat_qq(alpha = 0.6, color = "#d62728") +
+          stat_qq_line(color = "red") +
+          labs(title = paste("Q-Q Plot:", mejor_trans$Transformacion), x = "Teóricos", y = "Residuos") +
+          theme_minimal()
+        
+        # Mostrar gráficos
+        grid.arrange(p1, p2, p3, p4, ncol = 2, 
+                     top = "Gráfico 8.1: Comparación de Transformaciones - Diagnósticos de Residuos")
+      } else {
+        # Solo Q-Q plot si la original es la mejor
+        p2 <- ggplot(data_orig, aes(sample = .resid)) +
+          stat_qq(alpha = 0.6, color = "#2b8cbe") +
+          stat_qq_line(color = "red") +
+          labs(title = "Q-Q Plot: G3 Original", x = "Teóricos", y = "Residuos") +
+          theme_minimal()
+        
+        grid.arrange(p1, p2, ncol = 2, 
+                     top = "Gráfico 8.1: Diagnósticos del Modelo Original")
+      }
+      
+    } else {
+      cat("\n\nNo se pudo determinar la mejor transformación debido a datos faltantes.\n")
+    }
+  } else {
+    cat("No se pudieron calcular las transformaciones.\n")
+  }
+  
+} else {
+  cat("Datos no disponibles para análisis de transformaciones.\n")
+}
+```
+
+
+
+## Analisis de observaciones influyentes
+
+```{r influential-treatment-simple-por, results='asis'}
+if (exists("slr_model")) {
+  
+  model_data <- augment(slr_model)
+  cooksd_threshold <- 4/nrow(model_data)
+  
+  # Identificar observaciones influyentes
+  influential_indices <- which(model_data$.cooksd > cooksd_threshold)
+  
+  if (length(influential_indices) > 0) {
+    cat("Observaciones influyentes encontradas:", length(influential_indices), "\n\n")
+    
+    # Crear tabla simple
+    tabla_influyentes <- model_data[influential_indices, ] %>%
+      dplyr::select(all_of(c(best_predictor, "G3")), .cooksd) %>%
+      mutate(
+        ID = influential_indices,
+        .cooksd = round(.cooksd, 4)
+      ) %>%
+      dplyr::select(ID, everything()) %>%
+      head(10)
+    
+    print(kable(tabla_influyentes,
+                caption = "Tabla 8.2: Observaciones Influyentes",
+                format = "html") %>%
+          kable_styling(full_width = FALSE))
+    
+    # GRÁFICO DE OBSERVACIONES INFLUYENTES
+    cat("\n")
+    
+    # Crear gráfico mostrando observaciones influyentes
+    p_influence <- ggplot(model_data, aes(x = .data[[best_predictor]], y = G3)) +
+      geom_point(alpha = 0.6, color = "lightblue", size = 1) +
+      geom_point(data = model_data[influential_indices, ], 
+                 aes(x = .data[[best_predictor]], y = G3), 
+                 color = "red", size = 2.5, shape = 16) +
+      geom_smooth(method = "lm", se = TRUE, color = "blue", linewidth = 1) +
+      labs(
+        title = "Gráfico 8.2: Identificación de Observaciones Influyentes",
+        subtitle = paste("Puntos rojos: observaciones con Cook's D >", round(cooksd_threshold, 6)),
+        x = best_predictor,
+        y = "G3 (Nota Final)",
+        caption = paste("Total de observaciones influyentes:", length(influential_indices))
+      ) +
+      theme_minimal() +
+      theme(legend.position = "bottom")
+    
+    print(p_influence)
+    
+  } else {
+    cat("No se encontraron observaciones influyentes.\n")
+  }
+} else {
+  cat("Modelo no disponible.\n")
+}
+```
+
+
+Causas Posibles de G3 = 0:
+
+**Ausentismo:** Estudiantes que no presentaron el examen final.<br/>
+**Abandono académico:** Deserción durante el curso.<br/>
+**Problemas personales:** Circunstancias que impidieron completar el curso.<br/>
+**Errores de registro:** Posibles errores en la captura de datos.<br/>
+
