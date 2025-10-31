@@ -2294,5 +2294,339 @@ if (exists("modelo_final") && exists("best_predictor")) {
 ```
 
 
+# Aplicación: Regresión Lineal Simple (student_por)
+
+En nuestro análisis del dataset `student_por`, aplicamos regresión lineal simple para modelar la relación entre las calificaciones previas (G1 o G2) y la nota final (G3), permitiendo predecir el rendimiento académico final basado en el desempeño previo del estudiante.
+
+
+## Selección de Variables Predictoras
+
+Se identifican y seleccionan las variables con mayor poder predictivo basándose en las correlaciones calculadas en el EDA. Este paso es fundamental para construir un modelo moderado y efectivo.
+
+```{r slr-variable-selection_por, results='asis'}
+# Selección de variables predictoras basada en correlación con G3
+if (nrow(df_por) > 0) {
+  library(dplyr)
+  library(knitr) 
+  
+  # Calcular correlaciones con G3 para todas las variables numéricas
+  # Usar dplyr:: para evitar conflictos de namespace
+  nums <- df_por %>% dplyr::select(where(is.numeric))
+  
+  
+  if ("G3" %in% names(nums)) {
+    cor_with_g3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
+    
+    # Crear tabla ordenada de correlaciones
+    cor_table <- tibble(
+      variable = rownames(cor_with_g3),
+      correlacion = as.numeric(cor_with_g3[,1])
+    ) %>%
+      filter(variable != "G3") %>%
+      arrange(desc(abs(correlacion))) %>%
+      mutate(
+        correlacion = round(correlacion, 4),
+        abs_correlacion = round(abs(correlacion), 4)
+      )
+    
+    # Mostrar tabla de correlaciones
+    cor_table %>%
+      head(10) %>%
+      kable(caption = "Tabla 7.1: Variables numéricas ordenadas por correlación con G3", 
+            format = "html") %>%
+      kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed")) %>%
+      cat()
+    
+    # Identificar el mejor predictor
+    best_predictor <- cor_table$variable[1]
+    best_correlation <- cor_table$correlacion[1]
+    
+    cat("\n Por lo tanto, la variable seleccionada para la regresión es:", best_predictor, 
+        "\n con una correlación de:", round(best_correlation, 4), "\n con respecto a G3")
+  }
+} else {
+  cat("Dataset student_mat no disponible para análisis.")
+}
+```
+
+
+## Visualización de la Relación Lineal
+
+Antes del ajuste formal, se explora visualmente la relación entre el predictor seleccionado y la variable objetivo para confirmar la adequacidad de un modelo lineal y identificar posibles patrones o valores influyentes.
+
+```{r slr-scatter-plot_por, fig.width=8, fig.height=6, results='asis'}
+# Gráfico de dispersión con línea de tendencia
+if (nrow(df_por) > 0 && exists("best_predictor")) {
+  library(ggplot2)
+  
+  # Crear el gráfico de dispersión
+  p_scatter <- ggplot(df_por, aes_string(x = best_predictor, y = "G3")) +
+    geom_point(alpha = 0.6, size = 2, color = "#2b8cbe") +
+    geom_smooth(method = "lm", se = TRUE, color = "red", fill = "pink", alpha = 0.3) +
+    labs(
+      title = paste("Gráfico 7.1: Relación entre", best_predictor, "y G3"),
+      subtitle = paste("Correlación r =", round(best_correlation, 4)),
+      x = paste(best_predictor, "(Variable Predictora)"),
+      y = "G3 (Nota Final)"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 12),
+      axis.title = element_text(size = 11)
+    )
+  
+  print(p_scatter)
+  
+  # Estadísticas descriptivas de ambas variables
+  stats_table <- df_por %>%
+    dplyr::select(all_of(c(best_predictor, "G3"))) %>%
+    summarise(
+      across(everything(), list(
+        n = ~sum(!is.na(.)),
+        media = ~round(mean(., na.rm = TRUE), 2),
+        sd = ~round(sd(., na.rm = TRUE), 2),
+        min = ~min(., na.rm = TRUE),
+        max = ~max(., na.rm = TRUE)
+      ), .names = "{.col}_{.fn}")
+    ) %>%
+    pivot_longer(everything(), names_to = "stat", values_to = "value") %>%
+    separate(stat, into = c("variable", "estadistico"), sep = "_(?=[^_]+$)") %>%
+    pivot_wider(names_from = estadistico, values_from = value)
+  
+  stats_table %>%
+    kable(
+      caption = "Tabla 7.2: Estadísticas descriptivas de las variables del modelo", 
+      format = "html"
+    ) %>%
+    kable_styling(
+      full_width = FALSE, 
+      bootstrap_options = c("striped", "hover", "condensed")
+    ) %>%
+    cat()
+  
+} else {
+  cat("No se puede generar el gráfico: datos o predictor no disponibles.")
+}
+```
+
+
+## Ajuste del Modelo de Regresión Lineal Simple
+
+Se ajusta el modelo de regresión lineal simple utilizando mínimos cuadrados ordinarios (OLS) y se extraen los coeficientes principales junto con sus medidas de significancia estadística.
+
+```{r slr-model-fit-por, results='asis'}
+# Ajuste del modelo de regresión lineal simple
+if (nrow(df_por) > 0 && exists("best_predictor")) {
+  library(broom)
+  
+  # Crear fórmula del modelo
+  formula_str <- paste("G3 ~", best_predictor)
+  model_formula <- as.formula(formula_str)
+  
+  # Ajustar el modelo
+  slr_model <- lm(model_formula, data = df_por)
+
+  # Resumen del modelo
+  model_summary <- summary(slr_model)
+  
+  # Extraer coeficientes usando broom para formato tidy
+  coefficients_table <- tidy(slr_model) %>%
+    mutate(
+      estimate = round(estimate, 4),
+      std.error = round(std.error, 4),
+      statistic = round(statistic, 3),
+      p.value = ifelse(p.value < 0.001, "< 0.001", round(p.value, 4))
+    ) %>%
+    rename(
+      Término = term,
+      Coeficiente = estimate,
+      `Error Estándar` = std.error,
+      `Estadístico t` = statistic,
+      `Valor p` = p.value
+    )
+  
+  # Mostrar tabla de coeficientes
+  coefficients_table %>%
+    kable(
+      caption = "Tabla 7.3: Coeficientes del modelo de regresión lineal simple", 
+      format = "html"
+    ) %>%
+    kable_styling(
+      full_width = FALSE, 
+      bootstrap_options = c("striped", "hover", "condensed")
+    ) %>%
+    cat()
+  
+  # Métricas de bondad de ajuste
+  model_metrics <- tibble(
+    Métrica = c("R-cuadrado", "R-cuadrado ajustado", "Error estándar residual", "Estadístico F", "Valor p del modelo"),
+    Valor = c(
+      round(model_summary$r.squared, 4),
+      round(model_summary$adj.r.squared, 4),
+      round(model_summary$sigma, 4),
+      round(model_summary$fstatistic[1], 3),
+      ifelse(
+        pf(model_summary$fstatistic[1], 
+           model_summary$fstatistic[2], 
+           model_summary$fstatistic[3], 
+           lower.tail = FALSE) < 0.001, 
+        "< 0.001", 
+        round(pf(model_summary$fstatistic[1], 
+                 model_summary$fstatistic[2], 
+                 model_summary$fstatistic[3], 
+                 lower.tail = FALSE), 4)
+      )
+    )
+  )
+  
+  model_metrics %>%
+    kable(
+      caption = "Tabla 7.4: Métricas de bondad de ajuste del modelo", 
+      format = "html"
+    ) %>%
+    kable_styling(
+      full_width = FALSE, 
+      bootstrap_options = c("striped", "hover", "condensed")
+    ) %>%
+    cat()
+  
+  # Ecuación del modelo
+  intercept <- round(coefficients(slr_model)[1], 4)
+  slope <- round(coefficients(slr_model)[2], 4)
+  
+  cat("\n**Ecuación del modelo ajustado:**")
+  cat("\nG3 =", intercept, "+", slope, "×", best_predictor)
+  cat("\n\n**Interpretación:**")
+  cat("\n\n- Por cada unidad adicional en", best_predictor, ", G3 aumenta en promedio", slope, "puntos")
+  cat("\n\n- El modelo explica", round(model_summary$r.squared * 100, 2), "% de la variabilidad en G3")
+  
+} else {
+  cat("No se puede ajustar el modelo: datos o predictor no disponibles.")
+}
+```
+
+## Validación de Supuestos del Modelo
+
+Se verifican los supuestos fundamentales de la regresión lineal: linealidad, homocedasticidad, normalidad de residuos e independencia. Esta validación es crucial para confirmar la validez de las inferencias estadísticas.
+
+### Calcular residuos y valores ajustados
+
+```{r slr-assumptions1-por}
+# Validación de supuestos del modelo
+if (exists("slr_model")) {
+  library(ggplot2)
+  library(gridExtra)
+  
+  # Calcular residuos y valores ajustados
+  model_data <- augment(slr_model)
+  
+  # 1. Gráfico de residuos vs valores ajustados (homocedasticidad y linealidad)
+    ggplot(model_data, aes(x = .fitted, y = .resid)) +
+    geom_point(alpha = 0.6, color = "#2b8cbe") +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_smooth(method = "loess", se = FALSE, color = "orange") +
+    labs(
+      title = "Grafico 4.4.1: Residuos vs Valores Ajustados",
+      subtitle =  paste("n =", nrow(model_data), "observaciones, Evaluación de linealidad y homocedasticidad"),
+      x = "Valores Ajustados",
+      y = "Residuos"
+    ) +
+    theme_minimal()
+}
+``` 
+
+#### Análisis del Gráfico de Residuos vs Valores Ajustados
+
+- **Distribución centrada en cero:** Los residuos se distribuyen alrededor de la línea horizontal en y = 0 (línea roja punteada), lo que indica que el modelo no presenta sesgo sistemático en sus predicciones.
+- **Patrón relativamente aleatorio:** No se observa una estructura clara o patrón curvilíneo pronunciado en los residuos, sugiriendo que el supuesto de linealidad se cumple razonablemente bien.
+- **Homocedasticidad apropiada:** La dispersión de los residuos se mantiene relativamente constante a lo largo del rango de valores ajustados, indicando que la varianza de los errores es estable (homocedasticidad).
+
+#### Observaciones que Requieren Atención:
+
+- **Curvatura sutil en la línea LOESS:** La línea naranja **LOcally wEighted Scatterplot Smoothing** (suavizado LOESS) muestra una ligera curvatura descendente hacia el extremo derecho, sugiriendo una posible no-linealidad menor en valores altos de la predicción.
+- **Presencia de valores extremos:** Se observan algunos residuos con valores absolutos superiores a 5 y hasta cerca de -10, indicando la presencia de observaciones con residuos grandes que podrían ser influyentes.
+- **Distribución equilibrada:** Los puntos se distribuyen de manera relativamente uniforme a lo largo del rango de valores ajustados (0-20), lo que es favorable para la estabilidad del modelo.
+- **Interpretación para el Modelo G3 ~ G2:** El gráfico sugiere que el modelo de regresión lineal simple es apropiado para estos datos del dataset student_por, con las siguientes consideraciones:
+
+El modelo captura adecuadamente la relación principal entre G2 y G3
+Los supuestos de linealidad y homocedasticidad se cumplen satisfactoriamente
+La dispersión de residuos es más controlada comparada con el dataset student_mat
+La ligera curvatura observada es mínima y no compromete significativamente la validez del modelo
+
+#### Recomendación:
+El modelo actual es válido y robusto para predicción, pero se recomienda:
+
+- Identificar y examinar las observaciones con residuos extremos
+
+- Considerar la inclusión de variables predictoras adicionales si están disponibles
+
+- Evaluar si transformaciones menores de las variables mejoran el ajuste
+
+En conjunto, este análisis respalda la solidez del modelo ajustado y su capacidad para hacer predicciones confiables de las calificaciones finales (G3) basadas en las calificaciones del segundo período (G2) para el dataset de portugués.
+
+
+### Calcular Q-Q plot para normalidad de residuos
+  
+```{r slr-assumptions2-por}
+# Validación de supuestos del modelo
+if (exists("slr_model")) {
+  library(ggplot2)
+  library(gridExtra)
+
+  # 2. Q-Q plot para normalidad de residuos
+  ggplot(model_data, aes(sample = .resid)) +
+    stat_qq(alpha = 0.6, color = "#2b8cbe") +
+    stat_qq_line(color = "red") +
+    labs(
+      title = "Grafica 4.4.2.1: Q-Q Plot de Residuos",
+      subtitle = "Evaluación de normalidad",
+      x = "Cuantiles Teóricos",
+      y = "Cuantiles de Residuos"
+    ) +
+    theme_minimal()
+ }
+```
+
+
+#### Análisis del Q-Q Plot de Residuos
+
+**Seguimiento general de la línea teórica:** 
+
+La mayoría de los puntos (aproximadamente 85-90%) se alinean bien con la línea roja diagonal, indicando que los residuos se aproximan razonablemente a una distribución normal.
+
+**Comportamiento central adecuado:** 
+
+En la región central del gráfico (cuantiles teóricos entre -1 y +1), los puntos siguen muy de cerca la línea de referencia, lo cual es una buena señal para la normalidad.
+
+#### Desviaciones Observadas:
+
+- **Colas pesadas en extremos inferiores:** En el extremo izquierdo (cuantiles teóricos < -2), los puntos se desvían por debajo de la línea roja, formando una curva que indica residuos más extremos de lo esperado en la cola inferior.
+- **Desviación en cola superior:** En el extremo derecho (cuantiles teóricos > +1), algunos puntos se alejan por encima de la línea, mostrando una desviación moderada hacia valores más altos.
+- **Patrón escalonado distintivo:** La forma muestra líneas horizontales agrupadas, característico de variables discretas (calificaciones enteras), donde múltiples estudiantes obtuvieron la misma nota.
+
+#### Interpretación Estadística:
+
+**Implicaciones para el modelo:**
+Los residuos muestran aproximación razonable a la normalidad en la región central, pero con desviaciones en los extremos
+La estructura en líneas horizontales es esperada para datos de calificaciones discretas y no constituye una violación preocupante
+Las desviaciones en las colas son menos pronunciadas que en el dataset student_mat
+
+Impacto en las inferencias:
+
+- **Intervalos de confianza y pruebas t:** Mantienen validez apropiada para la mayoría de predicciones centrales.
+- **Validez del modelo:** El modelo es robusto y apropiado para el contexto educativo del dataset student_por
+- **Robustez:** Las inferencias son confiables dado el tamaño de muestra y la naturaleza discreta de los datos
+
+**Recomendaciones:**
+El modelo es válido y apropiado para uso práctico, con las siguientes consideraciones:
+
+- Reconocer que las líneas horizontales son normales para calificaciones discretas
+
+- Interpretar con cautela las predicciones en los extremos del rango
+
+- El modelo es más estable que el equivalente para student_mat
+
+En conjunto, este análisis confirma la solidez del modelo ajustado y su capacidad para hacer predicciones confiables de las calificaciones finales (G3) basadas en las calificaciones del segundo período (G2) para el dataset de portugués.
 
 
