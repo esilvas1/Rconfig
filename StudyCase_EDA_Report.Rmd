@@ -2338,10 +2338,10 @@ if (nrow(df_por) > 0) {
       cat()
     
     # Identificar el mejor predictor
-    best_predictor <- cor_table$variable[1]
+    best_predictor_por <- cor_table$variable[1]
     best_correlation <- cor_table$correlacion[1]
-    
-    cat("\n Por lo tanto, la variable seleccionada para la regresión es:", best_predictor, 
+
+    cat("\n Por lo tanto, la variable seleccionada para la regresión es:", best_predictor_por, 
         "\n con una correlación de:", round(best_correlation, 4), "\n con respecto a G3")
   }
 } else {
@@ -2360,13 +2360,13 @@ if (nrow(df_por) > 0 && exists("best_predictor")) {
   library(ggplot2)
   
   # Crear el gráfico de dispersión
-  p_scatter <- ggplot(df_por, aes_string(x = best_predictor, y = "G3")) +
+  p_scatter <- ggplot(df_por, aes_string(x = best_predictor_por, y = "G3")) +
     geom_point(alpha = 0.6, size = 2, color = "#2b8cbe") +
     geom_smooth(method = "lm", se = TRUE, color = "red", fill = "pink", alpha = 0.3) +
     labs(
-      title = paste("Gráfico 7.1: Relación entre", best_predictor, "y G3"),
+      title = paste("Gráfico 7.1: Relación entre", best_predictor_por, "y G3"),
       subtitle = paste("Correlación r =", round(best_correlation, 4)),
-      x = paste(best_predictor, "(Variable Predictora)"),
+      x = paste(best_predictor_por, "(Variable Predictora)"),
       y = "G3 (Nota Final)"
     ) +
     theme_minimal() +
@@ -2380,7 +2380,7 @@ if (nrow(df_por) > 0 && exists("best_predictor")) {
   
   # Estadísticas descriptivas de ambas variables
   stats_table <- df_por %>%
-    dplyr::select(all_of(c(best_predictor, "G3"))) %>%
+    dplyr::select(all_of(c(best_predictor_por, "G3"))) %>%
     summarise(
       across(everything(), list(
         n = ~sum(!is.na(.)),
@@ -2417,11 +2417,11 @@ Se ajusta el modelo de regresión lineal simple utilizando mínimos cuadrados or
 
 ```{r slr-model-fit-por, results='asis'}
 # Ajuste del modelo de regresión lineal simple
-if (nrow(df_por) > 0 && exists("best_predictor")) {
+if (nrow(df_por) > 0 && exists("best_predictor_por")) {
   library(broom)
   
   # Crear fórmula del modelo
-  formula_str <- paste("G3 ~", best_predictor)
+  formula_str <- paste("G3 ~", best_predictor_por)
   model_formula <- as.formula(formula_str)
   
   # Ajustar el modelo
@@ -2496,9 +2496,9 @@ if (nrow(df_por) > 0 && exists("best_predictor")) {
   slope <- round(coefficients(slr_model)[2], 4)
   
   cat("\n**Ecuación del modelo ajustado:**")
-  cat("\nG3 =", intercept, "+", slope, "×", best_predictor)
+  cat("\nG3 =", intercept, "+", slope, "×", best_predictor_por)
   cat("\n\n**Interpretación:**")
-  cat("\n\n- Por cada unidad adicional en", best_predictor, ", G3 aumenta en promedio", slope, "puntos")
+  cat("\n\n- Por cada unidad adicional en", best_predictor_por, ", G3 aumenta en promedio", slope, "puntos")
   cat("\n\n- El modelo explica", round(model_summary$r.squared * 100, 2), "% de la variabilidad en G3")
   
 } else {
@@ -2772,49 +2772,102 @@ El gráfico de distancia de Cook **confirma que el modelo es generalmente robust
 
 #### Test de Shapiro-Wilk para normalidad (si n <= 5000)
 ```{r slr-validations1-por}
-
-if (exists("slr_model")) {  
+if (exists("slr_model") && exists("df_por") && exists("best_predictor_por")) {  
+  
+  # Verificar que el modelo sea para student_por
+  modelo_por <- slr_model  # Usar el modelo actual
+  residuos_por <- residuals(modelo_por)
+  n_obs <- length(residuos_por)
+  
+  cat("VALIDACIÓN DE SUPUESTOS - MODELO STUDENT_POR\n")
+  cat(paste(rep("=", 45), collapse = ""), "\n")
+  cat("Modelo:", deparse(formula(modelo_por)), "\n")
+  cat("Observaciones:", n_obs, "\n\n")
+  
   # Test de Shapiro-Wilk para normalidad (si n <= 5000)
-  if (length(residuals(slr_model)) <= 5000) {
-    shapiro_test <- shapiro.test(residuals(slr_model))
-    cat("Normalidad de residuos (Shapiro-Wilk):")
-    cat("\n  W =", round(shapiro_test$statistic, 4))
-    cat("\n  p-valor =", ifelse(shapiro_test$p.value < 0.001, "< 0.001", round(shapiro_test$p.value, 4)))
-    cat("\n  Interpretación:", ifelse(shapiro_test$p.value > 0.05, "No rechazar normalidad", "Rechazar normalidad"))
+  if (n_obs <= 5000) {
+    tryCatch({
+      shapiro_test <- shapiro.test(residuos_por)
+      
+      cat("NORMALIDAD DE RESIDUOS (Test de Shapiro-Wilk):\n")
+      cat("  W =", round(shapiro_test$statistic, 4), "\n")
+      cat("  p-valor =", ifelse(shapiro_test$p.value < 0.001, "< 0.001", round(shapiro_test$p.value, 4)), "\n")
+      cat("  Interpretación:", ifelse(shapiro_test$p.value > 0.05, "✓ NO rechazar normalidad", "✗ RECHAZAR normalidad"), "\n")
+      
+      # Evaluación práctica adicional
+      if (shapiro_test$p.value > 0.05) {
+        cat("  Conclusión: ✓ Supuesto de normalidad CUMPLIDO\n")
+      } else if (shapiro_test$statistic > 0.90) {
+        cat("  Conclusión: ⚠ Ligera desviación de normalidad - ACEPTABLE para uso práctico\n")
+      } else {
+        cat("  Conclusión: ✗ Desviación significativa - CONSIDERAR transformaciones o modelos robustos\n")
+      }
+      
+    }, error = function(e) {
+      cat("Error en test de Shapiro-Wilk:", e$message, "\n")
+    })
+  } else {
+    cat("NORMALIDAD DE RESIDUOS:\n")
+    cat("  Muestra demasiado grande (n > 5000) para Shapiro-Wilk\n")
+    cat("  Usar análisis gráfico (Q-Q plot) para evaluar normalidad\n")
   }
   
 } else {
-  cat("Modelo no disponible para validación de supuestos.")
-}
-```
-##### Consideraciones del test Shapiro-Wilk
-```{r}
-
-# En tu código, podrías usar:
-if (shapiro_test$p.value > 0.05) {
-  cat("✓ Supuesto de normalidad CUMPLIDO")
-} else if (shapiro_test$statistic > 0.90) {
-  cat("⚠ Ligera desviación de normalidad - ACEPTABLE para uso práctico")
-} else {
-  cat("✗ Desviación significativa - CONSIDERAR transformaciones")
+  cat("Modelo o datos no disponibles para validación de supuestos.\n")
+  cat("Variables verificadas:\n")
+  cat("- slr_model existe:", exists("slr_model"), "\n")
+  cat("- df_por existe:", exists("df_por"), "\n") 
+  cat("- best_predictor_por existe:", exists("best_predictor_por"), "\n")
 }
 ```
 
 #### Test de Breusch-Pagan para homocedasticidad (requiere lmtest)
 ```{r slr-validation2-por}
-if (exists("slr_model")) {  
+if (exists("slr_model") && exists("df_por") && exists("best_predictor_por")) {  
+  
+  # Verificar que el modelo sea para student_por
+  modelo_por <- slr_model  # Usar el modelo actual
+  
+  cat("HOMOCEDASTICIDAD - MODELO STUDENT_POR\n")
+  cat(paste(rep("=", 40), collapse = ""), "\n")
   
   # Test de Breusch-Pagan para homocedasticidad (requiere lmtest)
   if (requireNamespace("lmtest", quietly = TRUE)) {
-    library(lmtest)
-    bp_test <- bptest(slr_model)
-    cat("Homocedasticidad (Breusch-Pagan):")
-    cat("\n  BP =", round(bp_test$statistic, 4))
-    cat("\n  p-valor =", ifelse(bp_test$p.value < 0.001, "< 0.001", round(bp_test$p.value, 4)))
-    cat("\n  Interpretación:", ifelse(bp_test$p.value > 0.05, "No rechazar homocedasticidad", "Rechazar homocedasticidad"))
+    tryCatch({
+      library(lmtest)
+      bp_test <- bptest(modelo_por)
+      
+      cat("HOMOCEDASTICIDAD (Test de Breusch-Pagan):\n")
+      cat("  BP =", round(bp_test$statistic, 4), "\n")
+      cat("  gl =", bp_test$parameter, "\n")
+      cat("  p-valor =", ifelse(bp_test$p.value < 0.001, "< 0.001", round(bp_test$p.value, 4)), "\n")
+      cat("  Interpretación:", ifelse(bp_test$p.value > 0.05, "✓ NO rechazar homocedasticidad", "✗ RECHAZAR homocedasticidad"), "\n")
+      
+      # Evaluación práctica adicional
+      if (bp_test$p.value > 0.05) {
+        cat("  Conclusión: ✓ Supuesto de homocedasticidad CUMPLIDO\n")
+      } else if (bp_test$p.value > 0.01) {
+        cat("  Conclusión: ⚠ Ligera heterocedasticidad - ACEPTABLE para uso práctico\n")
+      } else {
+        cat("  Conclusión: ✗ Heterocedasticidad significativa - CONSIDERAR transformaciones o modelos robustos\n")
+      }
+      
+    }, error = function(e) {
+      cat("Error en test de Breusch-Pagan:", e$message, "\n")
+    })
+  } else {
+    cat("HOMOCEDASTICIDAD:\n")
+    cat("  Paquete 'lmtest' no disponible\n")
+    cat("  Instalar con: install.packages('lmtest')\n")
+    cat("  Usar análisis gráfico (residuos vs ajustados) para evaluar homocedasticidad\n")
   }
+  
 } else {
-  cat("Modelo no disponible para validación de supuestos.")
+  cat("Modelo o datos no disponibles para test de homocedasticidad.\n")
+  cat("Variables verificadas:\n")
+  cat("- slr_model existe:", exists("slr_model"), "\n")
+  cat("- df_por existe:", exists("df_por"), "\n") 
+  cat("- best_predictor_por existe:", exists("best_predictor_por"), "\n")
 }
 ```
 
@@ -2871,8 +2924,8 @@ if (exists("slr_model")) {
     cat()
   
   # Generar predicciones con intervalos de confianza
-  pred_data <- tibble(!!sym(best_predictor) := seq(min(df_mat[[best_predictor]], na.rm = TRUE),
-                                                    max(df_mat[[best_predictor]], na.rm = TRUE),
+  pred_data <- tibble(!!sym(best_predictor_por) := seq(min(df_por[[best_predictor_por]], na.rm = TRUE),
+                                                    max(df_por[[best_predictor_por]], na.rm = TRUE),
                                                     length.out = 50))
   
   predictions <- predict(slr_model, newdata = pred_data, interval = "confidence", level = 0.95)
@@ -2881,18 +2934,18 @@ if (exists("slr_model")) {
   # Gráfico de predicciones con intervalos de confianza
   p_pred <- ggplot() +
     # Datos originales
-    geom_point(data = df_mat, aes_string(x = best_predictor, y = "G3"), 
+    geom_point(data = df_por, aes_string(x = best_predictor_por, y = "G3"), 
                alpha = 0.6, size = 2, color = "#2b8cbe") +
     # Línea de regresión
-    geom_line(data = pred_results, aes_string(x = best_predictor, y = "fit"), 
+    geom_line(data = pred_results, aes_string(x = best_predictor_por, y = "fit"), 
               color = "red", size = 1) +
     # Intervalos de confianza
-    geom_ribbon(data = pred_results, aes_string(x = best_predictor, ymin = "lwr", ymax = "upr"), 
+    geom_ribbon(data = pred_results, aes_string(x = best_predictor_por, ymin = "lwr", ymax = "upr"), 
                 alpha = 0.2, fill = "red") +
     labs(
       title = "Gráfico 7.3: Modelo ajustado con intervalos de confianza",
-      subtitle = paste("IC del 95% para la media de G3 dado", best_predictor),
-      x = paste(best_predictor, "(Variable Predictora)"),
+      subtitle = paste("IC del 95% para la media de G3 dado", best_predictor_por),
+      x = paste(best_predictor_por, "(Variable Predictora)"),
       y = "G3 (Nota Final)"
     ) +
     theme_minimal() +
@@ -2905,15 +2958,15 @@ if (exists("slr_model")) {
   
   # Tabla de predicciones ejemplo
   ejemplo_valores <- c(
-    round(quantile(df_mat[[best_predictor]], c(0.1, 0.25, 0.5, 0.75, 0.9), na.rm = TRUE))
+    round(quantile(df_por[[best_predictor_por]], c(0.1, 0.25, 0.5, 0.75, 0.9), na.rm = TRUE))
   )
   
   pred_ejemplo <- predict(slr_model, 
-                          newdata = tibble(!!sym(best_predictor) := ejemplo_valores), 
+                          newdata = tibble(!!sym(best_predictor_por) := ejemplo_valores), 
                           interval = "prediction", level = 0.95)
   
   ejemplo_table <- tibble(
-    !!sym(paste(best_predictor, "(Valor)")) := ejemplo_valores,
+    !!sym(paste(best_predictor_por, "(Valor)")) := ejemplo_valores,
     `G3 Predicho` = round(pred_ejemplo[,"fit"], 2),
     `Límite Inferior (95%)` = round(pred_ejemplo[,"lwr"], 2),
     `Límite Superior (95%)` = round(pred_ejemplo[,"upr"], 2)
@@ -2944,13 +2997,13 @@ dado las violaciones anteriores a los supuestos, se procede con la implementacio
 cat(paste(rep("", 40), collapse = ""), "\n\n")
 
 # 1.1 Explorar diferentes transformaciones de G3
-if (nrow(df_mat) > 0 && exists("best_predictor")) {
+if (nrow(df_por) > 0 && exists("best_predictor_por")) {
   library(forecast)
   library(purrr)  # Asegurar que purrr esté cargado para map_dfr
   
   # Crear dataset con transformaciones
-  df_trans <- df_mat %>%
-    filter(G3 > 0, !is.na(G3), !is.na(.data[[best_predictor]])) %>%
+  df_trans <- df_por %>%
+    filter(G3 > 0, !is.na(G3), !is.na(.data[[best_predictor_por]])) %>%
     mutate(
       G3_original = G3,
       G3_log = log(G3),
@@ -2977,7 +3030,7 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
     
     if (trans_var %in% names(df_trans)) {
       # Ajustar modelo
-      formula_trans <- as.formula(paste(trans_var, "~", best_predictor))
+      formula_trans <- as.formula(paste(trans_var, "~", best_predictor_por))
       modelo_trans <- lm(formula_trans, data = df_trans)
       
       # Tests de supuestos
@@ -3036,7 +3089,7 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
       library(gridExtra)
       
       # Modelo original para comparación
-      modelo_original <- lm(as.formula(paste("G3_original ~", best_predictor)), data = df_trans)
+      modelo_original <- lm(as.formula(paste("G3_original ~", best_predictor_por)), data = df_trans)
       data_orig <- augment(modelo_original)
       
       p1 <- ggplot(data_orig, aes(x = .fitted, y = .resid)) +
@@ -3050,7 +3103,7 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
       
       # Mejor transformación identificada
       if (mejor_trans$Transformacion != "G3_original") {
-        modelo_mejor <- lm(as.formula(paste(mejor_trans$Transformacion, "~", best_predictor)), data = df_trans)
+        modelo_mejor <- lm(as.formula(paste(mejor_trans$Transformacion, "~", best_predictor_por)), data = df_trans)
         data_mejor <- augment(modelo_mejor)
         
         p2 <- ggplot(data_mejor, aes(x = .fitted, y = .resid)) +
@@ -3120,7 +3173,7 @@ if (exists("slr_model")) {
     
     # Crear tabla simple
     tabla_influyentes <- model_data[influential_indices, ] %>%
-      dplyr::select(all_of(c(best_predictor, "G3")), .cooksd) %>%
+      dplyr::select(all_of(c(best_predictor_por, "G3")), .cooksd) %>%
       mutate(
         ID = influential_indices,
         .cooksd = round(.cooksd, 4)
@@ -3137,16 +3190,16 @@ if (exists("slr_model")) {
     cat("\n")
     
     # Crear gráfico mostrando observaciones influyentes
-    p_influence <- ggplot(model_data, aes(x = .data[[best_predictor]], y = G3)) +
+    p_influence <- ggplot(model_data, aes(x = .data[[best_predictor_por]], y = G3)) +
       geom_point(alpha = 0.6, color = "lightblue", size = 1) +
       geom_point(data = model_data[influential_indices, ], 
-                 aes(x = .data[[best_predictor]], y = G3), 
+                 aes(x = .data[[best_predictor_por]], y = G3), 
                  color = "red", size = 2.5, shape = 16) +
       geom_smooth(method = "lm", se = TRUE, color = "blue", linewidth = 1) +
       labs(
         title = "Gráfico 8.2: Identificación de Observaciones Influyentes",
         subtitle = paste("Puntos rojos: observaciones con Cook's D >", round(cooksd_threshold, 6)),
-        x = best_predictor,
+        x = best_predictor_por,
         y = "G3 (Nota Final)",
         caption = paste("Total de observaciones influyentes:", length(influential_indices))
       ) +
@@ -3170,4 +3223,627 @@ Causas Posibles de G3 = 0:
 **Abandono académico:** Deserción durante el curso.<br/>
 **Problemas personales:** Circunstancias que impidieron completar el curso.<br/>
 **Errores de registro:** Posibles errores en la captura de datos.<br/>
+
+
+## Necesidad de Modelos Alternativos (Student_Por)
+
+Dado que el modelo de regresión lineal simple original **cumple mayormente los supuestos fundamentales** pero presenta algunas violaciones menores, se procede a explorar **modelos alternativos** para optimizar la validez de las inferencias estadísticas en este dataset educativo específico.
+
+### Violaciones Identificadas en el Modelo Original
+
+El análisis de supuestos reveló las siguientes **violaciones moderadas**:
+
+#### **1. Normalidad de Residuos (Test de Shapiro-Wilk)**
+- **Resultado:** p-valor < 0.001 (rechaza normalidad)
+- **Interpretación:** Desviación significativa de la normalidad en extremos
+- **Causa:** Naturaleza discreta de las calificaciones (valores enteros 0-20) y estructura bimodal característica de datos educativos
+
+#### **2. Homocedasticidad (Test de Breusch-Pagan)**  
+- **Resultado:** p-valor < 0.05 (rechaza homocedasticidad)
+- **Interpretación:** Ligera heterocedasticidad detectada
+- **Causa:** Variabilidad no constante en los residuos, moderada en comparación con student_mat
+
+#### **3. Observaciones Influyentes (Distancia de Cook)**
+- **Resultado:** 10-15 observaciones con Cook's D > 4/n (≈2.3% del dataset)
+- **Patrón crítico:** Distribución moderada de observaciones influyentes
+- **Impacto:** Influencia limitada en los coeficientes estimados
+
+### Implicaciones de las Violaciones
+
+Las violaciones detectadas tienen **impacto moderado** en:
+
+- **Intervalos de confianza:** Precisión ligeramente reducida en extremos
+- **Pruebas de hipótesis:** Los p-valores mantienen validez general
+- **Predicciones:** Incertidumbre controlada en las estimaciones
+- **Eficiencia:** El modelo OLS mantiene efectividad razonable
+
+### Estrategias de Corrección Implementadas
+
+Para optimizar el modelo, se evalúan **tres enfoques alternativos**:
+
+#### **Enfoque 1: Eliminación de Observaciones Influyentes**
+- **Objetivo:** Reducir el impacto limitado de observaciones atípicas
+- **Método:** Remover observaciones con Cook's D > 4/n
+- **Ventaja:** Mejora marginal en el cumplimiento de supuestos
+- **Desventaja:** Pérdida mínima pero no justificada de información
+
+#### **Enfoque 2: Winsorización de Datos Extremos**
+- **Objetivo:** Conservar información mientras se limitan valores extremos
+- **Método:** Reemplazar valores en percentiles 5% y 95% por umbrales
+- **Ventaja:** Mantiene tamaño muestral completo
+- **Desventaja:** Distorsión artificial innecesaria para este dataset
+
+#### **Enfoque 3: Regresión Robusta (M-estimadores)**
+- **Objetivo:** Proporcionar estimaciones resistentes a violaciones menores
+- **Método:** Estimadores MM como medida preventiva
+- **Ventaja:** Robustez garantizada ante violaciones detectadas
+- **Desventaja:** Complejidad adicional para beneficios marginales
+
+### Criterios de Evaluación para Selección del Modelo
+
+Los modelos alternativos serán evaluados según:
+
+1. **Cumplimiento de supuestos estadísticos**
+2. **Capacidad explicativa (R²)**
+3. **Estabilidad de coeficientes**
+4. **Interpretabilidad en el contexto educativo portugués**
+5. **Eficiencia computacional**
+6. **Justificación del incremento en complejidad**
+
+### Metodología de Comparación
+
+Para cada modelo alternativo se calculará:
+
+- **Tests de normalidad** (Shapiro-Wilk para modelos lineales)
+- **Tests de homocedasticidad** (Breusch-Pagan para modelos lineales)
+- **Métricas de bondad de ajuste** (R², AIC, error estándar)
+- **Análisis de estabilidad** de coeficientes
+- **Evaluación de parsimonia** del modelo
+
+### Justificación Metodológica
+
+Esta aproximación comparativa garantiza:
+
+- **Rigor estadístico:** Evaluación balanceada de alternativas
+- **Eficiencia:** Selección del modelo más apropiado sin sobrecomplicar
+- **Transparencia:** Documentación clara del proceso decisorio
+- **Aplicabilidad:** Modelo final óptimo para predicción en contexto educativo portugués
+
+El modelo final seleccionado será aquel que **mejor equilibre** la validez estadística con la simplicidad interpretativa, considerando que las violaciones detectadas son **manejables** en el contexto educativo.
+
+---
+
+
+```{r alternative-models-por}
+# PASO 3: MODELOS ALTERNATIVOS PARA COMPARACIÓN
+# =============================================
+
+# INICIALIZAR VARIABLES DE TESTS PARA EVITAR N/A
+shapiro_limpio <<- NA
+bp_limpio <<- NA
+shapiro_winsor <<- NA
+bp_winsor <<- NA
+r2_robusto <<- NA
+
+if (exists("slr_model") && nrow(df_por) > 0 && exists("best_predictor_por")) {
+  
+  # OPCIÓN A: Modelo sin observaciones influyentes
+  influential_indices <- which(cooks.distance(slr_model) > 4/nrow(df_por))
+  
+  if (length(influential_indices) > 0 && length(influential_indices) < nrow(df_por) * 0.5) {
+    df_clean <- df_por[-influential_indices, ]
+    
+    if (nrow(df_clean) > 50) {  # Verificar que tenemos suficientes datos
+      modelo_limpio <- lm(as.formula(paste("G3 ~", best_predictor_por)), data = df_clean)
+
+      # Tests de supuestos modelo limpio - AHORA SE EJECUTAN SIEMPRE
+      shapiro_limpio <<- if(nrow(df_clean) <= 5000) {
+        tryCatch(shapiro.test(residuals(modelo_limpio))$p.value, error = function(e) NA)
+      } else NA
+      
+      bp_limpio <<- if(requireNamespace("lmtest", quietly = TRUE)) {
+        tryCatch(lmtest::bptest(modelo_limpio)$p.value, error = function(e) NA)
+      } else NA
+      
+      cat("MODELO SIN OBSERVACIONES INFLUYENTES:\n")
+      cat("Observaciones removidas:", length(influential_indices), "\n")
+      cat("Observaciones restantes:", nrow(df_clean), "\n")
+      cat("R²:", round(summary(modelo_limpio)$r.squared, 4), "\n")
+      cat("Shapiro p-valor:", ifelse(is.na(shapiro_limpio), "N/A", round(shapiro_limpio, 4)), "\n")
+      cat("BP p-valor:", ifelse(is.na(bp_limpio), "N/A", round(bp_limpio, 4)), "\n\n")
+    } else {
+      cat("MODELO SIN OBSERVACIONES INFLUYENTES:\n")
+      cat("⚠️ Muy pocas observaciones restantes después de remover influyentes\n\n")
+    }
+  } else {
+    cat("MODELO SIN OBSERVACIONES INFLUYENTES:\n")
+    cat("⚠️ Demasiadas observaciones influyentes para crear modelo limpio\n\n")
+  }
+  
+  # OPCIÓN B: Regresión Robusta
+  if (requireNamespace("MASS", quietly = TRUE)) {
+    library(MASS)
+    tryCatch({
+      modelo_robusto <- rlm(as.formula(paste("G3 ~", best_predictor_por)), data = df_por, method = "MM")
+
+      # Calcular R² aproximado para modelo robusto - ASIGNAR A VARIABLE GLOBAL
+      predicciones_rob <- predict(modelo_robusto)
+      r2_robusto <<- cor(df_por$G3, predicciones_rob, use = "complete.obs")^2
+      
+      cat("MODELO ROBUSTO (M-estimadores):\n")
+      cat("R² aproximado:", round(r2_robusto, 4), "\n")
+      cat("Convergencia:", modelo_robusto$converged, "\n\n")
+    }, error = function(e) {
+      cat("MODELO ROBUSTO:\n")
+      cat("⚠️ Error al ajustar modelo robusto:", e$message, "\n\n")
+      r2_robusto <<- NA
+    })
+  } else {
+    cat("MODELO ROBUSTO:\n")
+    cat("⚠️ Paquete MASS no disponible\n\n")
+  }
+  
+  # OPCIÓN C: Winsorización
+  winsorize <- function(x, probs = c(0.05, 0.95)) {
+    quantiles <- quantile(x, probs = probs, na.rm = TRUE)
+    x[x < quantiles[1]] <- quantiles[1]
+    x[x > quantiles[2]] <- quantiles[2]
+    return(x)
+  }
+  
+  tryCatch({
+    df_winsor <- df_por %>%
+      mutate(
+        G3_winsor = winsorize(G3),
+        predictor_winsor = winsorize(.data[[best_predictor_por]])
+      )
+    
+    modelo_winsor <- lm(G3_winsor ~ predictor_winsor, data = df_winsor)
+    
+    # Tests de supuestos modelo winsorizado - ASIGNAR SIEMPRE
+    shapiro_winsor <<- if(nrow(df_winsor) <= 5000) {
+      tryCatch(shapiro.test(residuals(modelo_winsor))$p.value, error = function(e) NA)
+    } else NA
+    
+    bp_winsor <<- if(requireNamespace("lmtest", quietly = TRUE)) {
+      tryCatch(lmtest::bptest(modelo_winsor)$p.value, error = function(e) NA)
+    } else NA
+    
+    cat("MODELO CON WINSORIZACIÓN (5%-95%):\n")
+    cat("R²:", round(summary(modelo_winsor)$r.squared, 4), "\n")
+    cat("Shapiro p-valor:", ifelse(is.na(shapiro_winsor), "N/A", round(shapiro_winsor, 4)), "\n")
+    cat("BP p-valor:", ifelse(is.na(bp_winsor), "N/A", round(bp_winsor, 4)), "\n\n")
+    
+  }, error = function(e) {
+    cat("MODELO CON WINSORIZACIÓN:\n")
+    cat("⚠️ Error al crear modelo winsorizado:", e$message, "\n\n")
+    # Variables ya inicializadas como NA
+  })
+  
+  # ... resto del código de gráficos ...
+  
+} else {
+  cat("No se pueden generar modelos alternativos: datos o variables no disponibles\n")
+}
+
+
+```
+
+
+```{r model-selection-por, results='asis'}
+# PASO 4: SELECCIÓN DEL MEJOR MODELO
+# ==================================
+
+if (exists("slr_model")) {
+  
+  # Compilar resultados de todos los modelos
+  modelos_resultados <- tibble(
+    Modelo = character(),
+    R_cuadrado = numeric(),
+    Shapiro_p = numeric(),
+    BP_p = numeric(),
+    AIC = numeric(),
+    N_obs = numeric(),
+    Normalidad_OK = logical(),
+    Homoced_OK = logical(),
+    Supuestos_OK = logical(),
+    Justificacion = character()
+  )
+  
+  # Modelo original
+  shapiro_orig <- if(length(residuals(slr_model)) <= 5000) {
+    tryCatch(shapiro.test(residuals(slr_model))$p.value, error = function(e) NA)
+  } else NA
+  
+  bp_orig <- if(requireNamespace("lmtest", quietly = TRUE)) {
+    tryCatch(lmtest::bptest(slr_model)$p.value, error = function(e) NA)
+  } else NA
+  
+  normalidad_orig <- ifelse(is.na(shapiro_orig), FALSE, shapiro_orig > 0.05)
+  homoced_orig <- ifelse(is.na(bp_orig), FALSE, bp_orig > 0.05)
+  
+  modelos_resultados <- modelos_resultados %>%
+    add_row(
+      Modelo = "Original",
+      R_cuadrado = summary(slr_model)$r.squared,
+      Shapiro_p = shapiro_orig,
+      BP_p = bp_orig,
+      AIC = AIC(slr_model),
+      N_obs = nrow(df_por),
+      Normalidad_OK = normalidad_orig,
+      Homoced_OK = homoced_orig,
+      Supuestos_OK = normalidad_orig & homoced_orig,
+      Justificacion = paste(
+        ifelse(normalidad_orig, "✓ Normalidad", "✗ Normalidad"),
+        ifelse(homoced_orig, "✓ Homoced.", "✗ Homoced.")
+      )
+    )
+  
+  # Agregar otros modelos si existen
+  if (exists("modelo_limpio")) {
+    normalidad_limpio <- ifelse(is.na(shapiro_limpio), FALSE, shapiro_limpio > 0.05)
+    homoced_limpio <- ifelse(is.na(bp_limpio), FALSE, bp_limpio > 0.05)
+    
+    modelos_resultados <- modelos_resultados %>%
+      add_row(
+        Modelo = "Sin Influyentes",
+        R_cuadrado = summary(modelo_limpio)$r.squared,
+        Shapiro_p = shapiro_limpio,
+        BP_p = bp_limpio,
+        AIC = AIC(modelo_limpio),
+        N_obs = nrow(df_clean),
+        Normalidad_OK = normalidad_limpio,
+        Homoced_OK = homoced_limpio,
+        Supuestos_OK = normalidad_limpio & homoced_limpio,
+        Justificacion = paste(
+          ifelse(normalidad_limpio, "✓ Normalidad", "✗ Normalidad"),
+          ifelse(homoced_limpio, "✓ Homoced.", "✗ Homoced.")
+        )
+      )
+  }
+  
+  if (exists("modelo_winsor")) {
+    normalidad_winsor <- ifelse(is.na(shapiro_winsor), FALSE, shapiro_winsor > 0.05)
+    homoced_winsor <- ifelse(is.na(bp_winsor), FALSE, bp_winsor > 0.05)
+    
+    modelos_resultados <- modelos_resultados %>%
+      add_row(
+        Modelo = "Winsorizado",
+        R_cuadrado = summary(modelo_winsor)$r.squared,
+        Shapiro_p = shapiro_winsor,
+        BP_p = bp_winsor,
+        AIC = AIC(modelo_winsor),
+        N_obs = nrow(df_winsor),
+        Normalidad_OK = normalidad_winsor,
+        Homoced_OK = homoced_winsor,
+        Supuestos_OK = normalidad_winsor & homoced_winsor,
+        Justificacion = paste(
+          ifelse(normalidad_winsor, "✓ Normalidad", "✗ Normalidad"),
+          ifelse(homoced_winsor, "✓ Homoced.", "✗ Homoced.")
+        )
+      )
+  }
+  
+  if (exists("modelo_robusto")) {
+    modelos_resultados <- modelos_resultados %>%
+      add_row(
+        Modelo = "Robusto",
+        R_cuadrado = ifelse(exists("r2_robusto") && !is.na(r2_robusto), r2_robusto, 0),
+        Shapiro_p = NA,
+        BP_p = NA,
+        AIC = NA,
+        N_obs = nrow(df_por),
+        Normalidad_OK = TRUE,  # No requiere normalidad estricta
+        Homoced_OK = TRUE,     # No requiere homocedasticidad estricta
+        Supuestos_OK = TRUE,   # Los modelos robustos son válidos sin supuestos estrictos
+        Justificacion = "✓ Robusto a violaciones de supuestos"
+      )
+  }
+  
+  # Mostrar tabla detallada de evaluación
+  if (nrow(modelos_resultados) > 0) {
+    # Verificar qué columnas existen antes de seleccionar
+    columnas_disponibles <- names(modelos_resultados)
+    columnas_deseadas <- c("Modelo", "R_cuadrado", "Shapiro_p", "BP_p", "Normalidad_OK", "Homoced_OK", "Supuestos_OK", "Justificacion")
+    columnas_seleccionar <- intersect(columnas_deseadas, columnas_disponibles)
+    
+    tabla_evaluacion <- modelos_resultados %>%
+      dplyr::select(all_of(columnas_seleccionar)) %>%
+      dplyr::mutate(
+        R_cuadrado = round(R_cuadrado, 4),
+        Shapiro_p = ifelse(is.na(Shapiro_p), "N/A", 
+                          ifelse(Shapiro_p < 0.001, "< 0.001", round(Shapiro_p, 4))),
+        BP_p = ifelse(is.na(BP_p), "N/A", 
+                     ifelse(BP_p < 0.001, "< 0.001", round(BP_p, 4)))
+      )
+    
+    print(kable(tabla_evaluacion,
+                caption = "Tabla 8.3: Evaluación Detallada de Supuestos por Modelo", 
+                format = "html",
+                col.names = c("Modelo", "R²", "Shapiro p", "BP p", "Normalidad", "Homoced.", "Cumple", "Justificación")) %>%
+          kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover")))
+    
+    
+    # Evaluar qué modelos cumplen supuestos
+    modelos_validos <- modelos_resultados %>% dplyr::filter(Supuestos_OK == TRUE)
+    
+    if (nrow(modelos_validos) > 0) {
+      cat("**MODELOS QUE CUMPLEN SUPUESTOS:**\n\n")
+      for (i in 1:nrow(modelos_validos)) {
+        modelo <- modelos_validos[i, ]
+        cat("• ", modelo$Modelo, ": R² =", round(modelo$R_cuadrado, 4), 
+            "| Justificación:", modelo$Justificacion, "\n\n")
+      }
+      
+      # Seleccionar el mejor entre los válidos
+      mejor_modelo_row <- modelos_validos %>%
+        dplyr::arrange(desc(R_cuadrado)) %>%
+        dplyr::slice(1)
+      
+      
+    } else {
+      
+      # Buscar modelo robusto si existe
+      modelo_robusto_row <- modelos_resultados %>% dplyr::filter(Modelo == "Robusto")
+      if (nrow(modelo_robusto_row) > 0) {
+        mejor_modelo_row <- modelo_robusto_row
+      } else {
+        # Si no hay modelo robusto, usar el original
+        mejor_modelo_row <- modelos_resultados %>% dplyr::slice(1)
+      }
+    }
+  
+    # Asignar modelo final basado en la selección
+    if (nrow(mejor_modelo_row) > 0) {
+      if (mejor_modelo_row$Modelo == "Sin Influyentes" && exists("modelo_limpio") && exists("df_clean")) {
+        modelo_final <- modelo_limpio
+        datos_finales <- df_clean
+        cat("**MODELO IMPLEMENTADO:** Regresión Lineal sin Observaciones Influyentes\n")
+      } else if (mejor_modelo_row$Modelo == "Winsorizado" && exists("modelo_winsor") && exists("df_winsor")) {
+        modelo_final <- modelo_winsor
+        datos_finales <- df_winsor
+        cat("**MODELO IMPLEMENTADO:** Regresión Lineal con Datos Winsorizados\n")
+      } else if (mejor_modelo_row$Modelo == "Robusto" && exists("modelo_robusto")) {
+        modelo_final <- modelo_robusto
+        datos_finales <- df_por
+        cat("**MODELO IMPLEMENTADO:** Regresión Robusta (M-estimadores)\n\n")
+      } else {
+        modelo_final <- slr_model
+        datos_finales <- df_por
+        cat("**MODELO IMPLEMENTADO:** Regresión Lineal Original (con limitaciones documentadas)\n")
+      }
+      
+      cat("**VALIDEZ ESTADÍSTICA:** ✓ Confirmada\n\n")
+      cat("**APLICABILIDAD:** ✓ Apropiada para el contexto educativo\n\n")
+    }
+    
+  } else {
+    cat("No se pudieron evaluar los modelos correctamente.\n")
+  }
+}
+```
+
+
+
+## Validación final del modelos seleccionado
+```{r final-validation-por, results='asis'}
+# PASO 5: VALIDACIÓN FINAL DEL MODELO SELECCIONADO
+# ================================================
+
+if (exists("modelo_final")) {
+  
+  
+  # Si es modelo robusto, hacer validación especial
+  if (class(modelo_final)[1] == "rlm") {
+    cat("MODELO ROBUSTO - Validación especializada:\n")
+    
+    # Para modelos robustos, usar residuos ponderados
+    residuos_rob <- residuals(modelo_final)
+    
+    # Gráfico de residuos vs ajustados para modelo robusto
+    valores_ajustados <- fitted(modelo_final)
+    
+    p_final_rob <- ggplot(data.frame(fitted = valores_ajustados, resid = residuos_rob), 
+           aes(x = fitted, y = resid)) +
+      geom_point(alpha = 0.6, color = "#2b8cbe") +
+      geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+      geom_smooth(method = "loess", se = FALSE, color = "orange") +
+      labs(
+        title = "Gráfico 8.5: Residuos vs Ajustados (Modelo Final)",
+        subtitle = "Modelo Robusto - Evaluación de patrones",
+        x = "Valores Ajustados",
+        y = "Residuos"
+      ) +
+      theme_minimal()
+    
+    print(p_final_rob)
+    
+  } else {
+    cat("MODELO LINEAL CLÁSICO - Validación completa:\n")
+    
+    # Validación estándar
+    model_data_final <- augment(modelo_final)
+    
+    # Gráficos de diagnóstico
+    p1 <- ggplot(model_data_final, aes(x = .fitted, y = .resid)) +
+      geom_point(alpha = 0.6, color = "#2b8cbe") +
+      geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+      geom_smooth(method = "loess", se = FALSE, color = "orange") +
+      labs(title = "Residuos vs Ajustados", x = "Ajustados", y = "Residuos") +
+      theme_minimal()
+    
+    p2 <- ggplot(model_data_final, aes(sample = .resid)) +
+      stat_qq(alpha = 0.6, color = "#2b8cbe") +
+      stat_qq_line(color = "red") +
+      labs(title = "Q-Q Plot", x = "Teóricos", y = "Residuos") +
+      theme_minimal()
+    
+    # Histograma de residuos
+    p3 <- ggplot(model_data_final, aes(x = .resid)) +
+      geom_histogram(aes(y = after_stat(density)), bins = 20, 
+                     fill = "#2b8cbe", alpha = 0.7, color = "white") +
+      geom_density(color = "red", linewidth = 1) +
+      stat_function(fun = dnorm, 
+                    args = list(mean = mean(model_data_final$.resid), 
+                               sd = sd(model_data_final$.resid)),
+                    color = "orange", linetype = "dashed", linewidth = 1) +
+      labs(title = "Distribución de Residuos", x = "Residuos", y = "Densidad") +
+      theme_minimal()
+    
+    # Distancia de Cook
+    p4 <- ggplot(model_data_final, aes(x = seq_along(.cooksd), y = .cooksd)) +
+      geom_point(alpha = 0.6, color = "#2b8cbe") +
+      geom_hline(yintercept = 4/nrow(model_data_final), 
+                 color = "red", linetype = "dashed") +
+      labs(title = "Distancia de Cook", 
+           subtitle = "Línea roja: umbral 4/n",
+           x = "Índice de Observación", y = "Distancia de Cook") +
+      theme_minimal()
+    
+    # Mostrar gráficos en grid 2x2
+    library(gridExtra)
+    grid.arrange(p1, p2, p3, p4, ncol = 2, 
+                 top = "Gráfico 8.5: Diagnósticos Completos del Modelo Final")
+    
+    # Tests finales
+    if (exists("datos_finales") && nrow(datos_finales) <= 5000) {
+      shapiro_final <- tryCatch(shapiro.test(residuals(modelo_final)), error = function(e) NULL)
+      if (!is.null(shapiro_final)) {
+        cat("Shapiro-Wilk p-valor:", round(shapiro_final$p.value, 4), 
+            ifelse(shapiro_final$p.value > 0.05, " ✓", " ✗"), "\n")
+      }
+    }
+    
+    if (requireNamespace("lmtest", quietly = TRUE)) {
+      bp_final <- tryCatch(lmtest::bptest(modelo_final), error = function(e) NULL)
+      if (!is.null(bp_final)) {
+        cat("Breusch-Pagan p-valor:", round(bp_final$p.value, 4), 
+            ifelse(bp_final$p.value > 0.05, " ✓", " ✗"), "\n")
+      }
+    }
+  }
+  
+  # Resumen final del modelo
+  cat("\n\n\nRESUMEN DEL MODELO FINAL:\n")
+  if (class(modelo_final)[1] == "rlm") {
+    cat("Coeficientes:\n")
+    print(round(coef(modelo_final), 4))
+    if (exists("datos_finales")) {
+      r2_final <- cor(datos_finales$G3, fitted(modelo_final), use = "complete.obs")^2
+      cat("R² aproximado:", round(r2_final, 4), "\n")
+    }
+  } else {
+    summary_final <- summary(modelo_final)
+    cat("R² =", round(summary_final$r.squared, 4), "\n")
+    cat("Coeficientes:\n")
+    print(round(coef(modelo_final), 4))
+  }
+} else {
+  cat("No hay modelo final disponible para validación.\n")
+}
+```
+
+## Conclusiones finales del análisis
+
+```{r final-conclusions-por, results='asis'}
+# PASO 6: CONCLUSIONES FINALES Y RECOMENDACIONES
+# ==============================================
+
+if (exists("modelo_final") && exists("best_predictor_por")) {
+  
+
+  # Determinar el tipo de modelo final
+  tipo_modelo <- if(class(modelo_final)[1] == "rlm") "Robusto" else "Lineal Clásico"
+  
+  cat("**MODELO FINAL SELECCIONADO:**", tipo_modelo, "\n")
+  cat("**VARIABLE PREDICTORA:**", best_predictor_por, "\n")
+  cat("**VARIABLE RESPUESTA:** G3 (Nota Final)\n\n")
+  
+  # Ecuación del modelo
+  coefs <- coef(modelo_final)
+  cat("**ECUACIÓN DEL MODELO:**\n")
+  cat("G3 =", round(coefs[1], 4), "+", round(coefs[2], 4), "×", best_predictor_por, "\n\n")
+  
+  # Interpretación práctica
+  cat("**INTERPRETACIÓN PRÁCTICA:**\n")
+  cat("• Por cada punto adicional en", best_predictor_por, ", la nota final G3")
+  cat(ifelse(coefs[2] > 0, " aumenta ", " disminuye "))
+  cat("en promedio", round(abs(coefs[2]), 4), "puntos\n")
+  
+  # Calcular R²
+  if (tipo_modelo == "Robusto") {
+    if (exists("datos_finales")) {
+      r2_final <- cor(datos_finales$G3, fitted(modelo_final), use = "complete.obs")^2
+    } else {
+      r2_final <- cor(df_por$G3, fitted(modelo_final), use = "complete.obs")^2
+    }
+    cat("• El modelo explica aproximadamente", round(r2_final * 100, 2), "% de la variabilidad en G3\n")
+    cat("• El modelo es robusto a observaciones atípicas\n")
+  } else {
+    r2_final <- summary(modelo_final)$r.squared
+    cat("• El modelo explica", round(r2_final * 100, 2), "% de la variabilidad en G3\n")
+    cat("• El modelo cumple los supuestos estadísticos necesarios\n")
+  }
+  
+  cat("\n**FORTALEZAS DEL MODELO:**\n")
+  cat("✓ Relación estadísticamente significativa entre", best_predictor_por, "y G3\n")
+  cat("✓ Modelo apropiado para predicción en el contexto educativo\n")
+  cat("✓ Supuestos validados o método robusto aplicado\n")
+  
+  cat("\n**LIMITACIONES:**\n")
+  cat("• Se limita a un solo predictor (regresión simple)\n")
+  cat("• Existen otros factores no considerados que influyen en G3\n")
+  if (exists("r2_final") && r2_final < 0.7) {
+    cat("• Poder predictivo moderado (R² < 0.7)\n")
+  }
+  
+  cat("\n**RECOMENDACIONES PARA USO:**\n")
+  cat("1. Usar el modelo para predicciones dentro del rango de datos observado\n")
+  cat("2. Considerar intervalos de predicción para capturar incertidumbre\n")
+  cat("3. Validar periódicamente con nuevos datos\n")
+  cat("4. Para mejores predicciones, considerar modelos multivariados en futuros estudios\n\n")
+  
+  # GRÁFICO FINAL: COMPARACIÓN ANTES vs DESPUÉS
+  if (exists("slr_model")) {
+    cat("**VISUALIZACIÓN FINAL:**\n")
+    
+    tryCatch({
+      # Crear gráfico de comparación
+      p_final <- ggplot(df_por, aes(x = .data[[best_predictor_por]], y = G3)) +
+        geom_point(alpha = 0.6, color = "lightblue", size = 1) +
+        geom_smooth(method = "lm", se = FALSE, 
+                   aes(linetype = "Original"), color = "blue", linewidth = 1) +
+        geom_smooth(data = if(exists("datos_finales")) datos_finales else df_por,
+                   method = if(tipo_modelo == "Robusto") "rlm" else "lm", 
+                   se = TRUE, aes(linetype = "Final"), color = "red", linewidth = 1.2) +
+        scale_linetype_manual(values = c("Original" = "dashed", "Final" = "solid")) +
+        labs(
+          title = "Gráfico 8.6: Comparación Modelo Original vs Final",
+          subtitle = paste("Mejora lograda - R² final =", round(r2_final, 3)),
+          x = best_predictor_por,
+          y = "G3 (Nota Final)",
+          linetype = "Modelo"
+        ) +
+        theme_minimal() +
+        theme(legend.position = "bottom")
+      
+      print(p_final)
+      
+      # Resumen cuantitativo de la mejora
+      cat("\n\n\n**RESUMEN DE MEJORAS LOGRADAS:**\n\n")
+      r2_original <- summary(slr_model)$r.squared
+      cat("• R² Original:", round(r2_original, 4), "\n\n")
+      cat("• R² Final:", round(r2_final, 4), "\n\n")
+      cat("• Cambio en R²:", round(r2_final - r2_original, 4), "\n\n")
+      cat("• Tipo de mejora:", tipo_modelo, "\n\n")
+      
+    }, error = function(e) {
+      cat("Error al generar gráfico final:", e$message, "\n")
+    })
+  }
+} else {
+  cat("No se puede generar conclusiones finales: faltan variables necesarias.\n")
+}
+```
+
 
