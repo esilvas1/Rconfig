@@ -1,4 +1,18 @@
 # Cargar las librerías necesarias
+
+install.packages("languageserver")
+
+remotes::install_github("nx10/httpgd")
+
+remotes::install_github("ManuelHentschel/vscDebugger")
+
+# Crear .Rprofile en el directorio HOME
+file.edit(file.path(Sys.getenv("HOME"), ".Rprofile"))
+
+# O crear en el directorio actual del proyecto
+file.edit(".Rprofile")
+
+
 library(shiny)
 library(ggplot2)
 library(tidyverse)

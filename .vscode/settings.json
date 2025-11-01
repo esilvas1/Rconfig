@@ -41,7 +41,9 @@
     "r.linting.enabled": false,
     "r.alwaysUseActiveTerminal": true,
     "r.bracketedPaste": true,
-    "r.rpath.windows": "",
-    "r.rterm.windows": "",
-    "r.sessionWatcher": true
+    "r.rpath.windows": "C:\\Program Files\\R\\R-4.5.1\\bin\\R.exe",
+    "r.rterm.windows": "C:\\Program Files\\R\\R-4.5.1\\bin\\R.exe",
+    "r.rpath.lsp": "C:\\Program Files\\R\\R-4.5.1\\bin\\R.exe",
+    "r.sessionWatcher": true,
+    "r.plot.useHttpgd": true
 }
