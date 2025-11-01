@@ -11,8 +11,8 @@ output:
 ---
 
 ```{r install-packages, include=FALSE}
-required_packages <- c("tidyverse", "knitr", "kableExtra", "broom", "ggplot2", 
-                       "forcats", "scales", "dplyr", "gridExtra", "lmtest", "forecast")
+required_packages <- c("tidyverse", "knitr", "kableExtra", "broom", "ggplot2","pandoc", 
+                       "forcats", "scales", "dplyr", "gridExtra", "lmtest", "forecast","httpgd","rmarkdown")
 
 missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
 
@@ -3845,5 +3845,4 @@ if (exists("modelo_final") && exists("best_predictor_por")) {
   cat("No se puede generar conclusiones finales: faltan variables necesarias.\n")
 }
 ```
-
 

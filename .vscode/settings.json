@@ -45,5 +45,9 @@
     "r.rterm.windows": "C:\\Program Files\\R\\R-4.5.1\\bin\\R.exe",
     "r.rpath.lsp": "C:\\Program Files\\R\\R-4.5.1\\bin\\R.exe",
     "r.sessionWatcher": true,
-    "r.plot.useHttpgd": true
+    "r.plot.useHttpgd": true,
+    "r.plot.defaults.height": 500,
+    "r.plot.defaults.width": 700,
+    "r.rmarkdown.knit.enable": true,
+    "r.rmarkdown.enableCodeLens": true
 }

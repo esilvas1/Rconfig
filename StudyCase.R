@@ -12,6 +12,7 @@ file.edit(file.path(Sys.getenv("HOME"), ".Rprofile"))
 # O crear en el directorio actual del proyecto
 file.edit(".Rprofile")
 
+install.packages("pandoc")
 
 library(shiny)
 library(ggplot2)
