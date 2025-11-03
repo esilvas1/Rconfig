@@ -119,7 +119,7 @@ A continuació se genera un resumen numerico del dataset **student_mat** refleja
 # Crear resumen numérico directamente a partir de student-mat.csv
 if (nrow(df_mat) > 0) {
   num_sum_mat <- df_mat %>%
-    select(where(is.numeric)) %>%
+    dplyr::select(where(is.numeric)) %>%
     summarise(across(everything(), list(
       mean = ~mean(.x, na.rm = TRUE),
       sd = ~sd(.x, na.rm = TRUE),
@@ -174,7 +174,7 @@ A continuacion se grafican las variables numericas graficos **Boxplots** para vi
 if (nrow(df_mat)>0) {
   library(ggplot2)
   # Boxplots por variables numéricas
-  nums <- df_mat %>% select(where(is.numeric))
+  nums <- df_mat %>% dplyr::select(where(is.numeric))
   if (ncol(nums) > 0) {
     nums_long <- nums %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
     p2 <- ggplot(nums_long, aes(x = variable, y = value)) +
@@ -194,7 +194,7 @@ Aplicando la funcionalidad de detección de **Outliers** visualizamos en la sigu
 ```{r mat-outliers}
 # Detección de outliers por regla IQR para variables numéricas
 if (nrow(df_mat) > 0) {
-  nums <- df_mat %>% select(where(is.numeric))
+  nums <- df_mat %>% dplyr::select(where(is.numeric))
   out_mat <- map_dfr(names(nums), function(var) {
     x <- nums[[var]]
     if (all(is.na(x))) return(tibble(variable = var, outlier_count = 0))
@@ -218,7 +218,7 @@ En el siguiente grafico (Grafica A2) se realiza un grafico de correlación con l
 if (nrow(df_mat)>0) {
   library(ggplot2)
   # Mapa de correlación (numéricas)
-  nums <- df_mat %>% select(where(is.numeric))
+  nums <- df_mat %>% dplyr::select(where(is.numeric))
   if (ncol(nums) >= 2) {
     cor_mat <- cor(nums, use = "pairwise.complete.obs")
     cor_df <- as.data.frame(as.table(cor_mat))
@@ -242,7 +242,7 @@ Teniendo en cuenta aquellas que superan el parametro de correlaciones fuertes (|
 ```{r mat-strong}
 # Correlaciones fuertes |r| >= 0.7 (numéricas)
 if (nrow(df_mat) > 0) {
-  nums <- df_mat %>% select(where(is.numeric))
+  nums <- df_mat %>% dplyr::select(where(is.numeric))
   strong_mat <- tibble()
   if (ncol(nums) >= 2) {
     cor_mat <- cor(nums, use = "pairwise.complete.obs")
@@ -253,7 +253,7 @@ if (nrow(df_mat) > 0) {
       filter(abs_r >= 0.7) %>%
       arrange(desc(abs_r)) %>%
       rename(variable1 = Var1, variable2 = Var2, r = Freq) %>%
-      select(variable1, variable2, r)
+      dplyr::select(variable1, variable2, r)
   }
 
   if (nrow(strong_mat) > 0) {
@@ -266,7 +266,7 @@ Para visualizar gráficamente las relaciones con mayor correlación (|r| notable
 
 ```{r mat-scatter}
 if (nrow(df_mat)>0) {
-  nums <- df_mat %>% select(where(is.numeric))
+  nums <- df_mat %>% dplyr::select(where(is.numeric))
   if ("G3" %in% names(nums) && ncol(nums) >= 2) {
     cor_with_G3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
     cor_with_G3 <- tibble(variable = rownames(cor_with_G3), corr = cor_with_G3[,1]) %>%
@@ -274,7 +274,7 @@ if (nrow(df_mat)>0) {
       arrange(desc(abs(corr)))
     top_vars <- head(cor_with_G3$variable, 6)
     if (length(top_vars) > 0) {
-      scatter_df <- df_mat %>% select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
+      scatter_df <- df_mat %>% dplyr::select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
       p4 <- ggplot(scatter_df, aes(x = value, y = G3)) +
         geom_point(alpha = 0.6, size = 1.5, color = "#2b8cbe") +
         geom_smooth(method = "lm", se = FALSE, color = "red") +
@@ -300,7 +300,7 @@ library(forcats)
 library(scales)
 library(dplyr)
 
-cat_vars <- df_mat %>% select(where(~ is.character(.) || is.factor(.)))
+cat_vars <- df_mat %>% dplyr::select(where(~ is.character(.) || is.factor(.)))
 
 if (nrow(df_mat) > 0 && ncol(cat_vars) > 0) {
 
@@ -361,7 +361,7 @@ if (nrow(df_mat) > 0 && ncol(cat_vars) > 0) {
   if (nrow(low_counts) > 0) {
     cat("\nCategorías de baja frecuencia (posibles atípicos):\n")
     low_counts %>%
-      select(variable, value2, n, pct) %>%
+      dplyr::select(variable, value2, n, pct) %>%
       distinct() %>%
       knitr::kable(digits = 2, caption = "Categorías con baja frecuencia (student_mat)") %>%
       kableExtra::kable_styling(full_width = FALSE)
@@ -384,7 +384,7 @@ A continuació se genera un resumen numerico del dataset **student_por** refleja
 # Crear resumen numérico directamente a partir de student-por.csv
 if (nrow(df_por) > 0) {
   num_sum_por <- df_por %>%
-    select(where(is.numeric)) %>%
+    dplyr::select(where(is.numeric)) %>%
     summarise(across(everything(), list(
       mean = ~mean(.x, na.rm = TRUE),
       sd = ~sd(.x, na.rm = TRUE),
@@ -439,7 +439,7 @@ A continuacion se grafican las variables numericas graficos **Boxplots** para vi
 if (nrow(df_por)>0) {
   library(ggplot2)
   # Boxplots por variables numéricas
-  nums <- df_por %>% select(where(is.numeric))
+  nums <- df_por %>% dplyr::select(where(is.numeric))
   if (ncol(nums) > 0) {
     nums_long <- nums %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
     p2 <- ggplot(nums_long, aes(x = variable, y = value)) +
@@ -459,7 +459,7 @@ Aplicando la funcionalidad de detección de **Outliers** visualizamos en la sigu
 ```{r por-outliers}
 # Detección de outliers por regla IQR para variables numéricas
 if (nrow(df_por) > 0) {
-  nums <- df_por %>% select(where(is.numeric))
+  nums <- df_por %>% dplyr::select(where(is.numeric))
   out_por <- map_dfr(names(nums), function(var) {
     x <- nums[[var]]
     if (all(is.na(x))) return(tibble(variable = var, outlier_count = 0))
@@ -483,7 +483,7 @@ En el siguiente grafico (Grafica B2) se realiza un grafico de correlación con l
 if (nrow(df_por)>0) {
   library(ggplot2)
   # Mapa de correlación (numéricas)
-  nums <- df_por %>% select(where(is.numeric))
+  nums <- df_por %>% dplyr::select(where(is.numeric))
   if (ncol(nums) >= 2) {
     cor_por <- cor(nums, use = "pairwise.complete.obs")
     cor_df <- as.data.frame(as.table(cor_por))
@@ -507,7 +507,7 @@ Teniendo en cuenta aquellas que superan el parametro de correlaciones fuertes (|
 ```{r por-strong}
 # Correlaciones fuertes |r| >= 0.7 (numéricas)
 if (nrow(df_por) > 0) {
-  nums <- df_por %>% select(where(is.numeric))
+  nums <- df_por %>% dplyr::select(where(is.numeric))
   strong_por <- tibble()
   if (ncol(nums) >= 2) {
     cor_por <- cor(nums, use = "pairwise.complete.obs")
@@ -518,7 +518,7 @@ if (nrow(df_por) > 0) {
       filter(abs_r >= 0.7) %>%
       arrange(desc(abs_r)) %>%
       rename(variable1 = Var1, variable2 = Var2, r = Freq) %>%
-      select(variable1, variable2, r)
+      dplyr::select(variable1, variable2, r)
   }
 
   if (nrow(strong_por) > 0) {
@@ -531,7 +531,7 @@ Para visualizar gráficamente las relaciones con mayor correlación (|r| notable
 
 ```{r por-scatter}
 if (nrow(df_por)>0) {
-  nums <- df_por %>% select(where(is.numeric))
+  nums <- df_por %>% dplyr::select(where(is.numeric))
   if ("G3" %in% names(nums) && ncol(nums) >= 2) {
     cor_with_G3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
     cor_with_G3 <- tibble(variable = rownames(cor_with_G3), corr = cor_with_G3[,1]) %>%
@@ -539,7 +539,7 @@ if (nrow(df_por)>0) {
       arrange(desc(abs(corr)))
     top_vars <- head(cor_with_G3$variable, 6)
     if (length(top_vars) > 0) {
-      scatter_df <- df_por %>% select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
+      scatter_df <- df_por %>% dplyr::select(all_of(c("G3", top_vars))) %>% pivot_longer(-G3, names_to = "variable", values_to = "value")
       p4 <- ggplot(scatter_df, aes(x = value, y = G3)) +
         geom_point(alpha = 0.6, size = 1.5, color = "#2b8cbe") +
         geom_smooth(method = "lm", se = FALSE, color = "red") +
@@ -564,7 +564,7 @@ library(forcats)
 library(scales)
 library(dplyr)
 
-cat_vars <- df_por %>% select(where(~ is.character(.) || is.factor(.)))
+cat_vars <- df_por %>% dplyr::select(where(~ is.character(.) || is.factor(.)))
 
 if (nrow(df_por) > 0 && ncol(cat_vars) > 0) {
 
@@ -625,7 +625,7 @@ if (nrow(df_por) > 0 && ncol(cat_vars) > 0) {
   if (nrow(low_counts) > 0) {
     cat("\nCategorías de baja frecuencia (posibles atípicos):\n")
     low_counts %>%
-      select(variable, value2, n, pct) %>%
+      dplyr::select(variable, value2, n, pct) %>%
       distinct() %>%
       knitr::kable(digits = 2, caption = "Categorías con baja frecuencia (student_mat)") %>%
       kableExtra::kable_styling(full_width = FALSE)
@@ -826,7 +826,7 @@ if (nrow(df_mat) > 0) {
   library(knitr)
   
   # Calcular correlaciones con G3 para todas las variables numéricas
-  nums <- df_mat %>% select(where(is.numeric))
+  nums <- df_mat %>% dplyr::select(where(is.numeric))
   
   if ("G3" %in% names(nums)) {
     cor_with_g3 <- cor(nums, use = "pairwise.complete.obs")[, "G3", drop = FALSE]
@@ -893,7 +893,7 @@ if (nrow(df_mat) > 0 && exists("best_predictor")) {
   
   # Estadísticas descriptivas de ambas variables
   stats_table <- df_mat %>%
-    select(all_of(c(best_predictor, "G3"))) %>%
+    dplyr::select(all_of(c(best_predictor, "G3"))) %>%
     summarise(
       across(everything(), list(
         n = ~sum(!is.na(.)),
@@ -1621,12 +1621,12 @@ if (exists("slr_model")) {
     
     # Crear tabla simple
     tabla_influyentes <- model_data[influential_indices, ] %>%
-      select(all_of(c(best_predictor, "G3")), .cooksd) %>%
+      dplyr::select(all_of(c(best_predictor, "G3")), .cooksd) %>%
       mutate(
         ID = influential_indices,
         .cooksd = round(.cooksd, 4)
       ) %>%
-      select(ID, everything()) %>%
+      dplyr::select(ID, everything()) %>%
       head(10)
     
     print(kable(tabla_influyentes,

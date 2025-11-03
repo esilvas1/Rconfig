@@ -204,3 +204,9 @@ print(eda_por$correlation$strong)
 
 # Fin del EDA
 # ...existing code...
+
+
+
+# Renderizar el documento completo
+rmarkdown::render("StudyCase_EDA_Report.Rmd", output_format = "html_document")
+browseURL("StudyCase_EDA_Report.html")
